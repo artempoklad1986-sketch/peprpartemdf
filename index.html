@@ -1,0 +1,4112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>АкваСбор PRO - Научная платформа для аквариумистов</title>
+    <meta name="description" content="Профессиональная PWA для аквариумистов с базой рыб и растений, калькуляторами и экспертной системой. Научный подход к содержанию аквариума.">
+    <meta name="keywords" content="аквариум, рыбы, растения, анализ воды, аквариумистика, PWA, калькуляторы">
+    <meta name="theme-color" content="#159895">
+
+    <!-- PWA манифест -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="АкваСбор PRO">
+
+    <!-- Предзагрузка критических ресурсов -->
+    <link rel="preload" href="./data/fish-database.json" as="fetch" crossorigin>
+    <link rel="preload" href="./data/plants-database.json" as="fetch" crossorigin>
+
+    <style>
+        /* ===== ОСНОВНЫЕ СТИЛИ ===== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        :root {
+            --primary-color: #159895;
+            --secondary-color: #57C5B6;
+            --accent-color: #ff6b35;
+            --dark-color: #002B36;
+            --light-color: #f8f9fa;
+            --success-color: #4CAF50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+            --info-color: #2196F3;
+            --text-color: #333;
+            --border-color: #dee2e6;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --shadow-hover: 0 4px 16px rgba(0,0,0,0.15);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a5f7a 0%, #159895 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            padding: 10px;
+            font-size: 14px;
+            padding-bottom: 80px;
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ===== ЗАГОЛОВОК И ПОДПИСКА ===== */
+        header {
+            background: linear-gradient(135deg, var(--dark-color) 0%, #004D61 100%);
+            color: white;
+            padding: 20px 15px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>') repeat;
+            animation: float 20s infinite linear;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-50px, -50px) rotate(360deg); }
+        }
+
+        .subscription-status {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10;
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .subscription-status:hover {
+            transform: scale(1.05);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .subscription-status.free { 
+            background: var(--danger-color); 
+            color: white; 
+        }
+        .subscription-status.pro { 
+            background: var(--success-color); 
+            color: white; 
+        }
+        .subscription-status.trial { 
+            background: var(--warning-color); 
+            color: white; 
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--secondary-color);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .scientific-note {
+            font-size: 0.9rem;
+            color: #B0E0E6;
+            font-style: italic;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== НАВИГАЦИЯ ===== */
+        .navigation {
+            display: flex;
+            overflow-x: auto;
+            background: var(--light-color);
+            border-bottom: 2px solid var(--border-color);
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            position: relative;
+        }
+
+        .navigation::-webkit-scrollbar { 
+            display: none; 
+        }
+
+        .navigation::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            transition: var(--transition);
+            z-index: 1;
+        }
+
+        .nav-btn {
+            flex: 0 0 auto;
+            padding: 15px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: var(--transition);
+            border-bottom: 3px solid transparent;
+            color: #495057;
+            min-width: 140px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            background: #e9ecef;
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn.active {
+            background: white;
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            box-shadow: var(--shadow);
+        }
+
+        .nav-btn.pro-locked {
+            opacity: 0.6;
+            position: relative;
+        }
+
+        .nav-btn.pro-locked::before {
+            content: '🔒';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 12px;
+            z-index: 1;
+        }
+
+        .pro-badge {
+            background: var(--accent-color);
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 12px;
+            margin-left: 6px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* ===== СЕКЦИИ КОНТЕНТА ===== */
+        .content-section {
+            display: none;
+            padding: 25px 20px;
+            min-height: 600px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .content-section.active { 
+            display: block; 
+        }
+
+        h1, h2 {
+            color: var(--dark-color);
+            margin-bottom: 25px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid var(--secondary-color);
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+        }
+
+        h1::after, h2::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: #004D61;
+            margin: 25px 0 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h4 {
+            color: #004D61;
+            margin: 20px 0 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ===== КАРТОЧКИ И СЕТКИ ===== */
+        .card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card.pro-feature.locked {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            opacity: 0.7;
+            cursor: not-allowed;
+            border-color: #ccc;
+        }
+
+        .card.pro-feature.locked::before {
+            background: #ccc;
+        }
+
+        .card.featured {
+            border: 2px solid var(--accent-color);
+            box-shadow: 0 4px 20px rgba(255, 107, 53, 0.2);
+        }
+
+        .card.featured::before {
+            background: var(--accent-color);
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .grid-1 { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+        .grid-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .grid-5 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+        /* ===== ФОРМЫ И ИНПУТЫ ===== */
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark-color);
+            font-size: 14px;
+        }
+
+        .form-group input, 
+        .form-group select, 
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            transition: var(--transition);
+            background: white;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(21, 152, 149, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* ===== КНОПКИ ===== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            transition: var(--transition);
+            margin: 5px;
+            position: relative;
+            overflow: hidden;
+            min-height: 44px;
+            white-space: nowrap;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.6s ease;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: white; }
+        .btn-success { background: var(--success-color); color: white; }
+        .btn-info { background: var(--info-color); color: white; }
+        .btn-warning { background: var(--warning-color); color: white; }
+        .btn-danger { background: var(--danger-color); color: white; }
+
+        .btn-outline-primary { 
+            background: transparent; 
+            color: var(--primary-color); 
+            border: 2px solid var(--primary-color); 
+        }
+
+        .btn-outline-primary:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* ===== РЕЗУЛЬТАТЫ ТЕСТОВ ===== */
+        .test-result {
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-top: 20px;
+            font-weight: 500;
+            animation: slideIn 0.4s ease-out;
+            border-left: 5px solid;
+            position: relative;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .test-result::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            opacity: 0.7;
+        }
+
+        .test-result.excellent { 
+            background: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745; 
+        }
+        .test-result.excellent::before { background: #28a745; }
+
+        .test-result.good { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8; 
+        }
+        .test-result.good::before { background: #17a2b8; }
+
+        .test-result.warning { 
+            background: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107; 
+        }
+        .test-result.warning::before { background: #ffc107; }
+
+        .test-result.danger { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545; 
+        }
+        .test-result.danger::before { background: #dc3545; }
+
+        /* ===== СТАТИСТИКА ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, white 0%, #f8f9fa 100%);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            text-align: center;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            counter-reset: number;
+            animation: countUp 1.5s ease-out;
+        }
+
+        @keyframes countUp {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 2rem;
+            opacity: 0.1;
+        }
+
+        /* ===== ПРОГРЕСС-БАРЫ ===== */
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 5px;
+            transition: width 1s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* ===== МОДАЛЬНЫЕ ОКНА ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            position: relative;
+            animation: modalSlideIn 0.4s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from { transform: scale(0.8) translateY(-50px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--danger-color);
+            transform: rotate(90deg);
+        }
+
+        /* ===== СПИСКИ И ЭЛЕМЕНТЫ ===== */
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .species-card {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .species-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--border-color);
+            transition: var(--transition);
+        }
+
+        .species-card:hover {
+            border-color: var(--secondary-color);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .species-card:hover::before {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .species-card.selected {
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, #f8fdff 0%, #e8f5e8 100%);
+        }
+
+        .species-card.selected::before {
+            background: var(--primary-color);
+        }
+
+        .species-card h4 {
+            color: var(--dark-color);
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .species-info {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .species-remove {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .species-remove:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        /* ===== ТАБЛИЦЫ СОВМЕСТИМОСТИ ===== */
+        .compatibility-matrix {
+            margin: 25px 0;
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .compatibility-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 600px;
+        }
+
+        .compatibility-table th,
+        .compatibility-table td {
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .compatibility-table th {
+            background: var(--light-color);
+            font-weight: 600;
+            color: var(--dark-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .compatibility-table tbody tr:hover {
+            background: rgba(21, 152, 149, 0.05);
+        }
+
+        .compat-excellent { background: #d4edda; color: #155724; }
+        .compat-good { background: #d1ecf1; color: #0c5460; }
+        .compat-caution { background: #fff3cd; color: #856404; }
+        .compat-poor { background: #f8d7da; color: #721c24; }
+
+        /* ===== КАЛЬКУЛЯТОРЫ ===== */
+        .calculator-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .calc-card {
+            background: white;
+            border: 2px solid var(--secondary-color);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .calc-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .calc-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(87, 197, 182, 0.3);
+        }
+
+        .calc-result {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            border: 2px solid var(--success-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-top: 20px;
+            animation: slideIn 0.4s ease-out;
+            position: relative;
+        }
+
+        .calc-result::before {
+            content: '✓';
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 30px;
+            height: 30px;
+            background: var(--success-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .calc-result h5 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        /* ===== БЛОКИРОВКА PRO-КОНТЕНТА ===== */
+        .section-locked {
+            text-align: center;
+            padding: 80px 30px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: var(--border-radius);
+            margin: 25px;
+            border: 2px dashed #ccc;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-locked::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="1" fill="rgba(0,0,0,0.05)"/></svg>') repeat;
+            z-index: 0;
+        }
+
+        .section-locked > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .lock-icon {
+            font-size: 5rem;
+            margin-bottom: 25px;
+            color: #999;
+            animation: lockShake 2s infinite;
+        }
+
+        @keyframes lockShake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+
+        .lock-title {
+            font-size: 1.8rem;
+            color: var(--dark-color);
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .lock-description {
+            color: #666;
+            margin-bottom: 35px;
+            line-height: 1.6;
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ===== ФОТО ГАЛЕРЕЯ ===== */
+        .photo-upload {
+            margin: 25px 0;
+            padding: 30px;
+            border: 3px dashed var(--secondary-color);
+            border-radius: var(--border-radius);
+            text-align: center;
+            background: linear-gradient(135deg, #f8fdff 0%, #e8f5e8 100%);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .photo-upload::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="1" fill="rgba(87,197,182,0.1)"/></svg>') repeat;
+            z-index: 0;
+        }
+
+        .photo-upload > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .photo-upload.dragover {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            border-color: var(--success-color);
+            transform: scale(1.02);
+        }
+
+        .photo-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: var(--transition);
+            background: var(--light-color);
+        }
+
+        .photo-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent 49%, rgba(255,255,255,0.1) 50%, transparent 51%);
+            z-index: 1;
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .photo-item:hover {
+            transform: scale(1.05) rotate(2deg);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .photo-item:hover::before {
+            opacity: 1;
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition);
+        }
+
+        .photo-item:hover img {
+            transform: scale(1.1);
+        }
+
+        .photo-delete {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            z-index: 2;
+        }
+
+        .photo-delete:hover {
+            background: var(--danger-color);
+            transform: scale(1.2) rotate(90deg);
+        }
+
+        /* ===== ЗАМЕТКИ ===== */
+        .notes-section {
+            margin: 25px 0;
+        }
+
+        .note-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 20px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            transition: var(--transition);
+            background: linear-gradient(135deg, white 0%, #f8f9fa 100%);
+        }
+
+        .note-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(21, 152, 149, 0.1);
+            background: white;
+        }
+
+        .notes-list {
+            margin-top: 20px;
+        }
+
+        .note-item {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-left: 5px solid var(--secondary-color);
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+            transition: var(--transition);
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+
+        .note-item:hover {
+            background: linear-gradient(135deg, #f0f7ff 0%, #e6f3ff 100%);
+            transform: translateX(8px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .note-date {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .note-text {
+            line-height: 1.6;
+            word-wrap: break-word;
+            color: var(--text-color);
+        }
+
+        .note-delete {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .note-delete:hover {
+            background: #c82333;
+            transform: scale(1.1) rotate(90deg);
+        }
+
+        /* ===== АЗОТНЫЙ ЦИКЛ ===== */
+        .nitrogen-stages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .stage-card {
+            background: white;
+            border: 2px solid var(--secondary-color);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            text-align: center;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stage-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .stage-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 10px 30px rgba(87, 197, 182, 0.2);
+        }
+
+        .stage-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .stage-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* ===== ЭКСПЕРТНЫЕ БЛОКИ ===== */
+        .expert-advice {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0fff0 100%);
+            border-left: 5px solid var(--success-color);
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+
+        .expert-advice::before {
+            content: '👨‍🔬';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            opacity: 0.7;
+        }
+
+        .expert-advice h4 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .expert-advice p {
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            color: #1b5e20;
+        }
+
+        .expert-source {
+            font-size: 12px;
+            color: #558b2f;
+            font-style: italic;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+            border: 1px solid #b0d4f1;
+            border-radius: var(--border-radius);
+            padding: 25px;
+            margin: 20px 0;
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+
+        .info-card::before {
+            content: 'ℹ️';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 20px;
+            opacity: 0.7;
+        }
+
+        .info-card h4 {
+            color: #1976d2;
+            margin-bottom: 15px;
+        }
+
+        .warning-card {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border: 1px solid #ffb74d;
+            border-radius: var(--border-radius);
+            padding: 25px;
+            margin: 20px 0;
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+
+        .warning-card::before {
+            content: '⚠️';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 20px;
+        }
+
+        .warning-card h4 {
+            color: #f57c00;
+            margin-bottom: 15px;
+        }
+
+        /* ===== ПАРАМЕТРЫ И ЗНАЧЕНИЯ ===== */
+        .parameter-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin: 15px 0;
+            transition: var(--transition);
+            position: relative;
+            border-left: 4px solid var(--secondary-color);
+        }
+
+        .parameter-card:hover {
+            border-left-color: var(--primary-color);
+            transform: translateX(5px);
+            box-shadow: var(--shadow);
+        }
+
+        .parameter-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        /* ===== СПИСКИ СОВЕТОВ ===== */
+        .tips-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        .tips-list li {
+            padding: 12px 0 12px 35px;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            transition: var(--transition);
+            line-height: 1.6;
+        }
+
+        .tips-list li:hover {
+            background: rgba(87, 197, 182, 0.05);
+            transform: translateX(8px);
+            padding-left: 40px;
+        }
+
+        .tips-list li:before {
+            content: '💡';
+            position: absolute;
+            left: 0;
+            top: 12px;
+            font-size: 16px;
+        }
+
+        .tips-list li:last-child {
+            border-bottom: none;
+        }
+
+        /* ===== ПЛАВАЮЩИЕ КНОПКИ ===== */
+        .floating-buttons {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 999;
+        }
+
+        .floating-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(21, 152, 149, 0.4);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .floating-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.4s ease;
+        }
+
+        .floating-btn:hover::before {
+            width: 200px;
+            height: 200px;
+        }
+
+        .floating-btn:hover {
+            background: #128285;
+            transform: translateY(-3px) scale(1.1);
+            box-shadow: 0 10px 30px rgba(21, 152, 149, 0.6);
+        }
+
+        .floating-btn.install {
+            background: var(--success-color);
+        }
+
+        .floating-btn.install:hover {
+            background: #45a049;
+            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.6);
+        }
+
+        .floating-btn.notification {
+            background: var(--warning-color);
+        }
+
+        .floating-btn.notification:hover {
+            background: #e68900;
+            box-shadow: 0 10px 30px rgba(255, 152, 0, 0.6);
+        }
+
+        /* ===== TOAST УВЕДОМЛЕНИЯ ===== */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #323232 0%, #424242 100%);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1001;
+            font-size: 14px;
+            font-weight: 500;
+            max-width: 90%;
+            text-align: center;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-15px);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #45a049 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c82333 100%);
+        }
+
+        .toast.warning {
+            background: linear-gradient(135deg, var(--warning-color) 0%, #e68900 100%);
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, var(--info-color) 0%, #1976d2 100%);
+        }
+
+        /* ===== ПРЕЛОАДЕР ===== */
+        .preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a5f7a 0%, #159895 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            transition: opacity 0.6s ease;
+        }
+
+        .preloader-logo {
+            font-size: 4rem;
+            margin-bottom: 30px;
+            animation: preloaderPulse 2s infinite;
+        }
+
+        @keyframes preloaderPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        .preloader-text {
+            font-size: 1.5rem;
+            margin-bottom: 40px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .preloader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid white;
+            border-radius: 50%;
+            animation: preloaderSpin 1s linear infinite;
+        }
+
+        @keyframes preloaderSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .preloader-progress {
+            margin-top: 30px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .preloader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ===== АДАПТИВНОСТЬ ===== */
+        @media (max-width: 1024px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .calc-grid { grid-template-columns: 1fr; }
+            .nitrogen-stages { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+                padding-bottom: 90px;
+                font-size: 13px;
+            }
+
+            .container {
+                border-radius: 10px;
+            }
+
+            header {
+                padding: 15px 10px;
+            }
+
+            .logo {
+                font-size: 2rem;
+            }
+
+            .tagline {
+                font-size: 1rem;
+            }
+
+            .scientific-note {
+                font-size: 0.8rem;
+            }
+
+            .navigation {
+                padding: 0 5px;
+            }
+
+            .nav-btn {
+                padding: 10px 12px;
+                font-size: 13px;
+                min-width: 100px;
+            }
+
+            .content-section {
+                padding: 20px 15px;
+            }
+
+            h1, h2 {
+                font-size: 1.4rem;
+            }
+
+            h3 {
+                font-size: 1.2rem;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .grid-3, .grid-4, .grid-5 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .species-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .photo-gallery {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .nitrogen-stages {
+                grid-template-columns: 1fr;
+            }
+
+            .floating-buttons {
+                bottom: 80px;
+                right: 15px;
+            }
+
+            .floating-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+
+            .modal-content {
+                padding: 25px 20px;
+                margin: 10px;
+            }
+
+            .compatibility-table {
+                font-size: 11px;
+            }
+
+            .compatibility-table th,
+            .compatibility-table td {
+                padding: 8px 4px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 2px;
+                padding-bottom: 100px;
+            }
+
+            .container {
+                border-radius: 8px;
+                margin: 2px;
+            }
+
+            header {
+                padding: 12px 8px;
+            }
+
+            .logo {
+                font-size: 1.8rem;
+            }
+
+            .subscription-status {
+                position: static;
+                margin-bottom: 10px;
+                display: inline-block;
+            }
+
+            .nav-btn {
+                padding: 8px 10px;
+                font-size: 12px;
+                min-width: 80px;
+            }
+
+            .content-section {
+                padding: 15px 10px;
+            }
+
+            .card {
+                padding: 15px;
+                margin: 15px 0;
+            }
+
+            .grid-3, .grid-4, .grid-5 {
+                grid-template-columns: 1fr;
+            }
+
+            .species-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .photo-gallery {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .floating-buttons {
+                bottom: 70px;
+                right: 10px;
+            }
+
+            .floating-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 16px;
+            }
+
+            .btn {
+                padding: 10px 16px;
+                font-size: 13px;
+                margin: 3px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .compatibility-table {
+                font-size: 10px;
+            }
+
+            .stat-number {
+                font-size: 1.8rem;
+            }
+        }
+
+        /* ===== АНИМАЦИИ ДЛЯ СПЕЦИАЛЬНЫХ ЭЛЕМЕНТОВ ===== */
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .loading-text {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading-text::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: loading-shimmer 1.5s infinite;
+        }
+
+        @keyframes loading-shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* ===== КАСТОМНЫЕ СКРОЛЛБАРЫ ===== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(45deg, #128285, #45a89a);
+        }
+
+        /* ===== ВЫДЕЛЕНИЕ ТЕКСТА ===== */
+        ::selection {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        ::-moz-selection {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* ===== ФОКУС ДЛЯ ДОСТУПНОСТИ ===== */
+        *:focus {
+            outline: 3px solid rgba(21, 152, 149, 0.3);
+            outline-offset: 2px;
+        }
+
+        .btn:focus,
+        .nav-btn:focus {
+            outline: 3px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Прелоадер -->
+    <div id="preloader" class="preloader">
+        <div class="preloader-logo">🐠</div>
+        <div class="preloader-text">АкваСбор PRO загружается...</div>
+        <div class="preloader-spinner"></div>
+        <div class="preloader-progress">Подключаем базы данных и научные алгоритмы...</div>
+    </div>
+
+    <!-- Плавающие кнопки -->
+    <div class="floating-buttons">
+        <button id="notificationBtn" class="floating-btn notification" title="Push-уведомления">🔔</button>
+        <button id="installBtn" class="floating-btn install" title="Установить PWA" style="display: none;">📱</button>
+        <button id="quickMenuBtn" class="floating-btn" title="Быстрое меню">⚡</button>
+    </div>
+
+    <div class="container">
+        <!-- Заголовок -->
+        <header>
+            <div id="subscriptionStatus" class="subscription-status free" onclick="showSubscriptionModal()">
+                БЕСПЛАТНО
+            </div>
+
+            <div class="logo">🐠 АкваСбор PRO</div>
+            <div class="tagline">Профессиональная научная платформа для аквариумистов</div>
+            <div class="scientific-note">
+                Основано на публикациях ScienceDirect, NCBI, Aquaculture Research и других научных журналах
+            </div>
+
+            <div class="header-buttons">
+                <button id="subscribeBtn" class="btn btn-warning" onclick="showSubscriptionModal()">
+                    🚀 Получить PRO за 399₽/мес
+                </button>
+                <button id="trialBtn" class="btn btn-info" onclick="startTrial()">
+                    ⏰ Попробовать 7 дней бесплатно
+                </button>
+            </div>
+        </header>
+
+        <!-- Навигация -->
+        <nav class="navigation">
+            <button class="nav-btn active" data-section="my-aquarium">
+                🏠 Мой аквариум
+            </button>
+            <button class="nav-btn" data-section="water-analysis">
+                🧪 Анализ воды
+            </button>
+            <button class="nav-btn pro-locked" data-section="fish-compatibility">
+                🐠 Совместимость рыб <span class="pro-badge">PRO</span>
+            </button>
+            <button class="nav-btn pro-locked" data-section="plant-compatibility">
+                🌿 Подбор растений <span class="pro-badge">PRO</span>
+            </button>
+            <button class="nav-btn pro-locked" data-section="calculators">
+                🧮 Калькуляторы <span class="pro-badge">PRO</span>
+            </button>
+            <button class="nav-btn" data-section="nitrogen-cycle">
+                🔄 Азотный цикл
+            </button>
+            <button class="nav-btn" data-section="lighting">
+                💡 Освещение
+            </button>
+            <button class="nav-btn pro-locked" data-section="aquascaping">
+                🎨 Акваскейпинг <span class="pro-badge">PRO</span>
+            </button>
+        </nav>
+
+        <!-- ====================== РАЗДЕЛ "МОЙ АКВАРИУМ" ====================== -->
+        <section id="my-aquarium" class="content-section active">
+            <h2>🏠 Мой аквариум</h2>
+
+            <!-- Статистика аквариума -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📸</div>
+                    <div class="stat-number" id="totalPhotos">0</div>
+                    <div class="stat-label">Фотографий</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📝</div>
+                    <div class="stat-number" id="totalNotes">0</div>
+                    <div class="stat-label">Заметок</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🧪</div>
+                    <div class="stat-number" id="totalTests">0</div>
+                    <div class="stat-label">Анализов воды</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏰</div>
+                    <div class="stat-number" id="aquariumAge">0</div>
+                    <div class="stat-label">Дней работы</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🐠</div>
+                    <div class="stat-number" id="totalFish">0</div>
+                    <div class="stat-label">Видов рыб</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🌿</div>
+                    <div class="stat-number" id="totalPlants">0</div>
+                    <div class="stat-label">Видов растений</div>
+                </div>
+            </div>
+
+            <!-- Параметры аквариума -->
+            <div class="card featured">
+                <h3>⚙️ Основные параметры аквариума</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Объем аквариума (л)</label>
+                        <input type="number" id="aquariumVolume" placeholder="100" min="1" max="10000">
+                        <div class="form-help">Общий объем аквариума в литрах</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Дата запуска</label>
+                        <input type="date" id="aquariumStartDate">
+                        <div class="form-help">Когда был запущен ваш аквариум</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Тип аквариума</label>
+                        <select id="aquariumType">
+                            <option value="">Выберите тип</option>
+                            <option value="freshwater">Пресноводный</option>
+                            <option value="marine">Морской</option>
+                            <option value="brackish">Солоноватый</option>
+                            <option value="planted">Травник</option>
+                            <option value="biotope">Биотоп</option>
+                            <option value="dutch">Голландский стиль</option>
+                            <option value="iwagumi">Ивагуми</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Система фильтрации</label>
+                        <select id="filtrationSystem">
+                            <option value="">Выберите систему</option>
+                            <option value="internal">Внутренний фильтр</option>
+                            <option value="external">Внешний фильтр</option>
+                            <option value="sump">Самп</option>
+                            <option value="multiple">Комбинированная</option>
+                            <option value="biofilter">Биологический фильтр</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Освещение (Вт)</label>
+                        <input type="number" id="aquariumLighting" placeholder="30" min="0" max="1000">
+                        <div class="form-help">Общая мощность освещения</div>
+                    </div>
+                    <div class="form-group">
+                        <label>CO₂ система</label>
+                        <select id="co2System">
+                            <option value="none">Без CO₂</option>
+                            <option value="diy">Самодельная (брага/дрожжи)</option>
+                            <option value="pressurized">Баллонная система</option>
+                            <option value="liquid">Жидкий CO₂</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Размеры аквариума -->
+                <h4>📐 Размеры аквариума</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Длина (см)</label>
+                        <input type="number" id="aquariumLength" placeholder="60" min="10" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label>Ширина (см)</label>
+                        <input type="number" id="aquariumWidth" placeholder="30" min="10" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label>Высота (см)</label>
+                        <input type="number" id="aquariumHeight" placeholder="40" min="15" max="150">
+                    </div>
+                    <div class="form-group">
+                        <label>Толщина стекла (мм)</label>
+                        <input type="number" id="glassThickness" placeholder="6" min="3" max="25">
+                    </div>
+                </div>
+
+                <!-- Дополнительные параметры -->
+                <h4>🔧 Дополнительное оборудование</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Обогреватель (Вт)</label>
+                        <input type="number" id="heaterPower" placeholder="100" min="0" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label>Производительность фильтра (л/ч)</label>
+                        <input type="number" id="filterFlow" placeholder="300" min="0" max="5000">
+                    </div>
+                    <div class="form-group">
+                        <label>Компрессор (л/ч)</label>
+                        <input type="number" id="airPump" placeholder="0" min="0" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label>УФ-стерилизатор (Вт)</label>
+                        <input type="number" id="uvSterilizer" placeholder="0" min="0" max="100">
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button id="saveAquariumParams" class="btn btn-success">
+                        💾 Сохранить параметры аквариума
+                    </button>
+                    <button id="calculateAquariumStats" class="btn btn-info">
+                        📊 Рассчитать характеристики
+                    </button>
+                    <button id="exportAquariumData" class="btn btn-secondary">
+                        📤 Экспорт данных
+                    </button>
+                </div>
+
+                <div id="aquariumCalculationResult"></div>
+            </div>
+
+            <!-- Фотогалерея -->
+            <div class="card">
+                <h3>📸 Галерея фотографий аквариума</h3>
+                <p style="color: #666; margin-bottom: 20px; line-height: 1.5;">
+                    Загружайте фото своего аквариума, рыб и растений. Поддерживается drag & drop, съемка с камеры и массовая загрузка. 
+                    Все фото автоматически сохраняются локально в высоком качестве.
+                </p>
+
+                <div class="photo-upload" id="photoUpload">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">📷</div>
+                    <p style="margin-bottom: 15px; font-size: 1.1rem; font-weight: 500;">
+                        Перетащите фото сюда или нажмите для выбора
+                    </p>
+                    <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+                    <div class="header-buttons">
+                        <button class="btn btn-secondary" onclick="document.getElementById('photoInput').click();">
+                            📎 Выбрать файлы
+                        </button>
+                        <button class="btn btn-info" onclick="takePhoto()">
+                            📷 Сделать фото
+                        </button>
+                        <button class="btn btn-success" onclick="exportPhotos()">
+                            📤 Экспорт всех фото
+                        </button>
+                        <button class="btn btn-danger" onclick="clearAllPhotos()">
+                            🗑️ Очистить галерею
+                        </button>
+                    </div>
+                </div>
+
+                <div id="photoGallery" class="photo-gallery"></div>
+
+                <div id="photoStats" style="margin-top: 20px; padding: 15px; background: var(--light-color); border-radius: var(--border-radius); display: none;">
+                    <div class="form-row">
+                        <div><strong>Всего фото:</strong> <span id="photoCount">0</span></div>
+                        <div><strong>Общий размер:</strong> <span id="photoSize">0 МБ</span></div>
+                        <div><strong>Последнее фото:</strong> <span id="lastPhoto">-</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Заметки и наблюдения -->
+            <div class="card">
+                <h3>📝 Журнал наблюдений и заметок</h3>
+                <p style="color: #666; margin-bottom: 20px; line-height: 1.5;">
+                    Ведите подробный дневник своего аквариума: поведение рыб, состояние растений, проводимые работы, 
+                    изменения параметров воды, добавление новых обитателей и растений.
+                </p>
+
+                <div class="form-group">
+                    <label>Новая заметка</label>
+                    <textarea id="noteInput" class="note-input" rows="5" placeholder="Опишите ваши наблюдения...
+
+Примеры заметок:
+• Подменил 30% воды, параметры стабильные
+• Заметил нерест у гуппи в правом углу
+• Добавил новое растение - Анубиас нана на корягу
+• Рыбы стали активнее после смены корма на Tetra Pro
+• Появились первые признаки цветения воды
+• Подрезал быстрорастущие растения
+• Почистил стекла и декорации от водорослей"></textarea>
+                </div>
+
+                <div class="header-buttons">
+                    <button id="addNote" class="btn btn-primary">
+                        💾 Добавить заметку
+                    </button>
+                    <button id="addQuickNote" class="btn btn-secondary">
+                        ⚡ Быстрая заметка
+                    </button>
+                    <button id="exportNotes" class="btn btn-info">
+                        📤 Экспорт заметок
+                    </button>
+                    <button id="searchNotes" class="btn btn-success">
+                        🔍 Поиск в заметках
+                    </button>
+                </div>
+
+                <!-- Быстрые кнопки -->
+                <div style="margin: 15px 0;">
+                    <h4>⚡ Быстрые заметки:</h4>
+                    <div class="header-buttons">
+                        <button class="btn btn-outline-primary" onclick="addQuickNote('🔄 Подмена воды')">Подмена воды</button>
+                        <button class="btn btn-outline-primary" onclick="addQuickNote('🐠 Кормление рыб')">Кормление</button>
+                        <button class="btn btn-outline-primary" onclick="addQuickNote('✂️ Стрижка растений')">Стрижка растений</button>
+                        <button class="btn btn-outline-primary" onclick="addQuickNote('🧽 Чистка стекол')">Чистка аквариума</button>
+                        <button class="btn btn-outline-primary" onclick="addQuickNote('🧪 Тест воды')">Тест воды</button>
+                        <button class="btn btn-outline-primary" onclick="addQuickNote('🌿 Внесение удобрений')">Удобрения</button>
+                    </div>
+                </div>
+
+                <div id="notesList" class="notes-list"></div>
+
+                <!-- Статистика заметок -->
+                <div id="notesStats" style="margin-top: 25px; padding: 20px; background: var(--light-color); border-radius: var(--border-radius); display: none;">
+                    <h4>📊 Статистика журнала:</h4>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number" id="notesThisWeek">0</div>
+                            <div class="stat-label">За неделю</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="notesThisMonth">0</div>
+                            <div class="stat-label">За месяц</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="averageNoteLength">0</div>
+                            <div class="stat-label">Символов в среднем</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="mostActiveDay">-</div>
+                            <div class="stat-label">Активный день</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Мои рыбы и растения -->
+            <div class="grid grid-2">
+                <!-- Список рыб -->
+                <div class="card">
+                    <h3>🐠 Рыбы в моем аквариуме</h3>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 13px;">
+                        Добавьте виды рыб для автоматического анализа совместимости и рекомендаций по содержанию.
+                    </p>
+
+                    <div class="form-group">
+                        <input type="text" id="fishSearch" placeholder="🔍 Поиск рыб (неон, гуппи, скалярия...)" style="margin-bottom: 10px;">
+                    </div>
+
+                    <div id="myFishList" class="species-grid"></div>
+
+                    <div class="header-buttons">
+                        <button id="addFish" class="btn btn-secondary">
+                            ➕ Добавить рыбу
+                        </button>
+                        <button id="analyzeFishCompatibility" class="btn btn-info">
+                            🔬 Анализ совместимости
+                        </button>
+                    </div>
+
+                    <div id="fishCompatibilityResult"></div>
+                </div>
+
+                <!-- Список растений -->
+                <div class="card">
+                    <h3>🌿 Растения в моем аквариуме</h3>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 13px;">
+                        Ведите учет растений для расчета потребностей в освещении, CO₂ и удобрениях.
+                    </p>
+
+                    <div class="form-group">
+                        <input type="text" id="plantSearch" placeholder="🔍 Поиск растений (анубиас, роталы, эхинодорус...)" style="margin-bottom: 10px;">
+                    </div>
+
+                    <div id="myPlantList" class="species-grid"></div>
+
+                    <div class="header-buttons">
+                        <button id="addPlant" class="btn btn-secondary">
+                            ➕ Добавить растение
+                        </button>
+                        <button id="analyzePlantNeeds" class="btn btn-success">
+                            💡 Потребности растений
+                        </button>
+                    </div>
+
+                    <div id="plantNeedsResult"></div>
+                </div>
+            </div>
+
+            <!-- Параметры воды (краткий обзор) -->
+            <div class="card">
+                <h3>💧 Последние параметры воды</h3>
+                <div id="lastWaterTest" style="text-align: center; padding: 40px; color: #666;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">🧪</div>
+                    <p>Параметры воды еще не тестировались</p>
+                    <button class="btn btn-primary" onclick="document.querySelector('[data-section=\"water-analysis\"]').click();">
+                        🔬 Провести анализ воды
+                    </button>
+                </div>
+            </div>
+
+            <!-- Задачи и напоминания -->
+            <div class="card">
+                <h3>✅ Задачи и напоминания по аквариуму</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Новая задача</label>
+                        <input type="text" id="taskInput" placeholder="Например: Подменить воду 30%">
+                    </div>
+                    <div class="form-group">
+                        <label>Дата напоминания</label>
+                        <input type="datetime-local" id="taskDate">
+                    </div>
+                </div>
+                <button id="addTask" class="btn btn-primary">➕ Добавить задачу</button>
+
+                <div id="tasksList"></div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "АНАЛИЗ ВОДЫ" ====================== -->
+        <section id="water-analysis" class="content-section">
+            <h2>🧪 Научный анализ параметров воды</h2>
+
+            <!-- Информационный блок -->
+            <div class="info-card">
+                <h4>📋 Протокол тестирования воды</h4>
+                <p><strong>Наша система анализа основана на научных стандартах:</strong></p>
+                <ul class="tips-list">
+                    <li><strong>EPA Water Quality Standards</strong> - стандарты качества воды</li>
+                    <li><strong>Aquaculture Research Journal</strong> - исследования токсичности NH₃/NH₄</li>
+                    <li><strong>Marine Biology Research</strong> - влияние pH на биодоступность металлов</li>
+                    <li><strong>Journal of Fish Biology</strong> - физиологические пределы рыб</li>
+                    <li>Тестируйте воду утром до кормления рыб (снижает погрешность на 15-20%)</li>
+                    <li>Используйте капельные тесты для критических параметров (точность ±0.1)</li>
+                    <li>Ведите журнал измерений минимум 2 недели для анализа тренда</li>
+                    <li>При обнаружении аномалий повторите тест через 2-4 часа</li>
+                </ul>
+                <div class="expert-source">Данные актуализированы: ноябрь 2024</div>
+            </div>
+
+            <!-- Быстрый экспресс-тест -->
+            <div class="card featured">
+                <h3>⚡ Экспресс-тест критических параметров</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Быстрая проверка самых важных параметров воды. Все поля опциональны - заполните только те, которые тестировали.
+                </p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>pH (кислотность)</label>
+                        <input type="number" id="quickPH" step="0.1" min="0" max="14" placeholder="6.5-8.0">
+                        <div class="form-help">Кислотно-щелочной баланс воды</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Температура (°C)</label>
+                        <input type="number" id="quickTemp" min="0" max="40" placeholder="22-28">
+                        <div class="form-help">Температура воды в аквариуме</div>
+                    </div>
+                    <div class="form-group">
+                        <label>NH₃/NH₄ (Аммиак/Аммоний, мг/л)</label>
+                        <input type="number" id="quickAmmonia" step="0.01" min="0" placeholder="0">
+                        <div class="form-help">Токсичный продукт жизнедеятельности рыб</div>
+                    </div>
+                    <div class="form-group">
+                        <label>NO₂ (Нитриты, мг/л)</label>
+                        <input type="number" id="quickNitrites" step="0.01" min="0" placeholder="0">
+                        <div class="form-help">Промежуточный продукт азотного цикла</div>
+                    </div>
+                    <div class="form-group">
+                        <label>NO₃ (Нитраты, мг/л)</label>
+                        <input type="number" id="quickNitrates" min="0" placeholder="< 25">
+                        <div class="form-help">Конечный продукт азотного цикла</div>
+                    </div>
+                    <div class="form-group">
+                        <label>O₂ (Кислород, мг/л)</label>
+                        <input type="number" id="quickOxygen" step="0.1" min="0" placeholder="5-8">
+                        <div class="form-help">Растворенный кислород в воде</div>
+                    </div>
+                </div>
+
+                <div class="header-buttons">
+                    <button class="btn btn-primary" onclick="performQuickTest()">
+                        🔬 Анализировать параметры
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearQuickTest()">
+                        🗑️ Очистить поля
+                    </button>
+                    <button class="btn btn-info" onclick="loadLastTest()">
+                        📋 Загрузить последний тест
+                    </button>
+                </div>
+
+                <div id="quickTestResult"></div>
+            </div>
+
+            <!-- Детальный анализ параметров -->
+            <div class="grid grid-2">
+                <!-- Жесткость и минералы -->
+                <div class="card">
+                    <h3>💎 Жесткость и минералы</h3>
+                    <div class="form-group">
+                        <label>GH (Общая жесткость, °dH)</label>
+                        <input type="number" id="gh" min="0" placeholder="4-16">
+                        <div class="form-help">Содержание Ca²⁺ и Mg²⁺. 1°dH = 17.8 мг/л CaCO₃</div>
+                    </div>
+                    <div class="form-group">
+                        <label>KH (Карбонатная жесткость, °dH)</label>
+                        <input type="number" id="kh" min="0" placeholder="3-10">
+                        <div class="form-help">Буферная емкость против колебаний pH</div>
+                    </div>
+                    <div class="form-group">
+                        <label>TDS (Общие растворенные соли, ppm)</label>
+                        <input type="number" id="tds" min="0" placeholder="150-300">
+                        <div class="form-help">Общая минерализация воды</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Электропроводность (µS/cm)</label>
+                        <input type="number" id="conductivity" min="0" placeholder="150-800">
+                        <div class="form-help">TDS ≈ EC × 0.67. Индикатор минерализации</div>
+                    </div>
+                </div>
+
+                <!-- Биогены и питание растений -->
+                <div class="card">
+                    <h3>🧬 Биогены и микроэлементы</h3>
+                    <div class="form-group">
+                        <label>PO₄ (Фосфаты, мг/л)</label>
+                        <input type="number" id="phosphates" step="0.01" min="0" placeholder="< 0.1">
+                        <div class="form-help">Лимитирующий биоген. Соотношение Редфилда N:P = 16:1</div>
+                    </div>
+                    <div class="form-group">
+                        <label>SiO₂ (Силикаты, мг/л)</label>
+                        <input type="number" id="silicates" step="0.1" min="0" placeholder="< 2">
+                        <div class="form-help">Питание для диатомовых водорослей</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Fe (Железо общее, мг/л)</label>
+                        <input type="number" id="iron" step="0.01" min="0" placeholder="0.05-0.1">
+                        <div class="form-help">Хелатированное железо для растений</div>
+                    </div>
+                    <div class="form-group">
+                        <label>CO₂ растворенный (мг/л)</label>
+                        <input type="number" id="co2Dissolved" step="1" min="0" placeholder="15-30">
+                        <div class="form-help">CO₂ = 3 × KH × 10^(7-pH)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Тяжелые металлы и токсиканты -->
+            <div class="card">
+                <h3>☠️ Токсиканты и тяжелые металлы</h3>
+                <div class="warning-card">
+                    <h4>⚠️ Внимание!</h4>
+                    <p>Тяжелые металлы крайне токсичны для рыб и беспозвоночных даже в микроскопических концентрациях. 
+                    Тестируйте регулярно, особенно при использовании водопроводной воды.</p>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cu (Медь, мг/л)</label>
+                        <input type="number" id="copper" step="0.001" min="0" placeholder="< 0.005">
+                        <div class="form-help">EPA критерий: Cu²⁺ > 0.0054 мг/л токсично для рыб</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Pb (Свинец, мг/л)</label>
+                        <input type="number" id="lead" step="0.001" min="0" placeholder="< 0.001">
+                        <div class="form-help">Нейротоксин. EPA стандарт: < 0.0025 мг/л</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Cl₂ (Хлор остаточный, мг/л)</label>
+                        <input type="number" id="chlorine" step="0.01" min="0" placeholder="0">
+                        <div class="form-help">Из водопроводной воды. LC₅₀ для рыб = 0.1-0.3 мг/л</div>
+                    </div>
+                    <div class="form-group">
+                        <label>ClO₂ (Хлорамин, мг/л)</label>
+                        <input type="number" id="chloramine" step="0.01" min="0" placeholder="0">
+                        <div class="form-help">Устойчивее хлора, нужны специальные кондиционеры</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Морские параметры -->
+            <div class="card">
+                <h3>🌊 Специальные параметры</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Соленость (‰ или ppt)</label>
+                        <input type="number" id="salinity" step="0.1" min="0" placeholder="0-35">
+                        <div class="form-help">Пресная: 0‰, солоноватая: 0.5-30‰, морская: 35‰</div>
+                    </div>
+                    <div class="form-group">
+                        <label>ORP (окислительно-восстановительный потенциал, мВ)</label>
+                        <input type="number" id="orp" min="-500" max="500" placeholder="200-400">
+                        <div class="form-help">Индикатор качества воды. >300 мВ = хорошая</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Ca (Кальций, мг/л)</label>
+                        <input type="number" id="calcium" min="0" placeholder="400-450 (море)">
+                        <div class="form-help">Критично для морских аквариумов и жестководных рыб</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Mg (Магний, мг/л)</label>
+                        <input type="number" id="magnesium" min="0" placeholder="1250-1350 (море)">
+                        <div class="form-help">Баланс Ca:Mg важен для кораллов</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопки анализа -->
+            <div class="card">
+                <div class="header-buttons">
+                    <button id="analyzeAllParameters" class="btn btn-success" style="font-size: 16px; padding: 15px 30px;">
+                        🔬 Полный научный анализ
+                    </button>
+                    <button id="exportAnalysis" class="btn btn-info">
+                        📤 Экспорт результатов
+                    </button>
+                    <button id="compareAnalysis" class="btn btn-secondary">
+                        📊 Сравнить с предыдущими
+                    </button>
+                    <button id="scheduleTest" class="btn btn-warning">
+                        ⏰ Напомнить о тесте
+                    </button>
+                </div>
+
+                <div id="fullAnalysisResult"></div>
+            </div>
+
+            <!-- Калькулятор токсичности аммиака -->
+            <div class="calculator-section">
+                <h3>🧮 Калькулятор токсичности аммиака</h3>
+                <div class="expert-advice">
+                    <h4>📐 Научная формула расчета токсичности NH₃</h4>
+                    <p>Процент токсичного NH₃ рассчитывается по формуле Хендерсона-Хассельбаха:</p>
+                    <div style="font-family: monospace; background: white; padding: 15px; border-radius: 4px; margin: 15px 0; font-size: 14px; border: 1px solid #ddd;">
+                        NH₃% = 100 / (1 + 10^((pKa + pH₂О) - (pH + pT)))<br>
+                        где pKa = 9.25 при 25°C, температурная коррекция pT = (273.15 + T) × 0.03
+                    </div>
+                </div>
+
+                <div class="calc-grid">
+                    <div class="calc-card">
+                        <h4>⚗️ Расчет токсичности NH₃</h4>
+                        <div class="form-group">
+                            <label>Общий аммиак NH₃/NH₄ (мг/л)</label>
+                            <input type="number" id="totalAmmonia" step="0.01" onchange="calculateAmmoniaToxicity()">
+                        </div>
+                        <div class="form-group">
+                            <label>pH воды</label>
+                            <input type="number" id="ammoniaPH" step="0.1" onchange="calculateAmmoniaToxicity()">
+                        </div>
+                        <div class="form-group">
+                            <label>Температура (°C)</label>
+                            <input type="number" id="ammoniaTemp" onchange="calculateAmmoniaToxicity()">
+                        </div>
+                        <div id="ammoniaToxicityResult"></div>
+                    </div>
+
+                    <div class="calc-card">
+                        <h4>📊 Шкала токсичности NH₃</h4>
+                        <div class="test-result excellent" style="margin: 10px 0;">
+                            <strong>Безопасно:</strong> NH₃ < 0.02 мг/л<br>
+                            <small>Нормальный уровень для всех рыб</small>
+                        </div>
+                        <div class="test-result warning" style="margin: 10px 0;">
+                            <strong>Осторожно:</strong> NH₃ 0.02-0.05 мг/л<br>
+                            <small>Допустимо кратковременно</small>
+                        </div>
+                        <div class="test-result danger" style="margin: 10px 0;">
+                            <strong>Токсично:</strong> NH₃ > 0.05 мг/л<br>
+                            <small>Экстренная подмена воды!</small>
+                        </div>
+
+                        <div class="parameter-card">
+                            <strong>Факторы влияния:</strong><br>
+                            • pH ↑ → токсичность ↑<br>
+                            • Температура ↑ → токсичность ↑<br>
+                            • Соленость ↑ → токсичность ↓<br>
+                            • Кислород ↓ → чувствительность ↑
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- История анализов -->
+            <div class="card">
+                <h3>📈 История анализов и статистика</h3>
+                <div class="header-buttons">
+                    <button id="showWaterChart" class="btn btn-info">
+                        📊 Показать график
+                    </button>
+                    <button id="exportWaterHistory" class="btn btn-secondary">
+                        📤 Экспорт истории
+                    </button>
+                    <button id="importWaterData" class="btn btn-success">
+                        📥 Импорт данных
+                    </button>
+                    <button id="clearWaterHistory" class="btn btn-danger" onclick="clearWaterHistory()">
+                        🗑️ Очистить историю
+                    </button>
+                </div>
+
+                <!-- График параметров -->
+                <div id="waterChart" style="margin: 25px 0; min-height: 300px; background: var(--light-color); border-radius: var(--border-radius); display: none; position: relative;">
+                    <div style="padding: 20px; text-align: center;">
+                        <p>График параметров воды будет отображен здесь</p>
+                        <small>Требуется минимум 3 измерения для построения графика</small>
+                    </div>
+                </div>
+
+                <!-- История тестов -->
+                <div id="waterTestHistory"></div>
+
+                <!-- Статистика -->
+                <div class="stats-grid" style="margin-top: 25px;">
+                    <div class="stat-card">
+                        <div class="stat-number" id="avgPH">-</div>
+                        <div class="stat-label">Средний pH</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="avgTemp">-</div>
+                        <div class="stat-label">Средняя T°C</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="maxAmmonia">-</div>
+                        <div class="stat-label">Макс NH₃</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="testsCount">-</div>
+                        <div class="stat-label">Всего тестов</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="lastTestDays">-</div>
+                        <div class="stat-label">Дней назад</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="testsThisMonth">-</div>
+                        <div class="stat-label">За месяц</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "СОВМЕСТИМОСТЬ РЫБ" (PRO) ====================== -->
+        <section id="fish-compatibility" class="content-section">
+            <div class="pro-feature" data-pro="fish-compatibility">
+                <div id="fishCompatibilityContent">
+                    <div class="section-locked">
+                        <div class="lock-icon">🔒</div>
+                        <div class="lock-title">Совместимость рыб</div>
+                        <div class="lock-description">
+                            Получите доступ к научной базе из 200+ видов рыб с детальным анализом совместимости 
+                            по температуре, pH, агрессивности, размеру, типу питания, зонированию в аквариуме 
+                            и другим параметрам. Алгоритм учитывает поведенческие особенности и экологические ниши.
+                        </div>
+                        <div style="margin: 30px 0;">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-number">200+</div>
+                                    <div class="stat-label">Видов рыб</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number">15</div>
+                                    <div class="stat-label">Параметров анализа</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number">4</div>
+                                    <div class="stat-label">Уровня совместимости</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-warning" onclick="showSubscriptionModal()" style="font-size: 16px; padding: 15px 30px;">
+                            🚀 Получить PRO доступ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "ПОДБОР РАСТЕНИЙ" (PRO) ====================== -->
+        <section id="plant-compatibility" class="content-section">
+            <div class="pro-feature" data-pro="plant-selection">
+                <div id="plantCompatibilityContent">
+                    <div class="section-locked">
+                        <div class="lock-icon">🔒</div>
+                        <div class="lock-title">Подбор растений</div>
+                        <div class="lock-description">
+                            Умная система подбора растений по параметрам вашего аквариума. База из 150+ видов растений 
+                            с требованиями к освещению, CO₂, удобрениям, температуре и жесткости воды. 
+                            AI-алгоритм рассчитает оптимальные условия для каждого растения.
+                        </div>
+                        <div style="margin: 30px 0;">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-number">150+</div>
+                                    <div class="stat-label">Видов растений</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number">AI</div>
+                                    <div class="stat-label">Алгоритм подбора</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number">12</div>
+                                    <div class="stat-label">Параметров среды</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-warning" onclick="showSubscriptionModal()" style="font-size: 16px; padding: 15px 30px;">
+                            🚀 Получить PRO доступ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "КАЛЬКУЛЯТОРЫ" (PRO) ====================== -->
+        <section id="calculators" class="content-section">
+            <div class="pro-only" data-pro="calculators">
+                <div id="calculatorsContent">
+                    <div class="section-locked">
+                        <div class="lock-icon">🔒</div>
+                        <div class="lock-title">15+ Продвинутых калькуляторов</div>
+                        <div class="lock-description">
+                            Профессиональные калькуляторы для всех аспектов аквариумистики: объем аквариума и стекла, 
+                            грунт и слои для растений, освещение и PAR, питание растений NPK, дозировка удобрений, 
+                            лекарств, кормления рыб и многое другое с научными алгоритмами.
+                        </div>
+                        <div style="margin: 30px 0;">
+                            <div class="grid grid-4">
+                                <div class="card">
+                                    <h4>📐 Объем и стекло</h4>
+                                    <p>Расчет объема, толщины стекла, веса с водой</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🏔️ Грунт и слои</h4>
+                                    <p>Количество грунта, питательная подложка</p>
+                                </div>
+                                <div class="card">
+                                    <h4>💡 Освещение PAR</h4>
+                                    <p>Мощность светильников, DLI для растений</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🌿 Питание NPK</h4>
+                                    <p>Удобрения по Редфилду, микроэлементы</p>
+                                </div>
+                                <div class="card">
+                                    <h4>💊 Дозировка лекарств</h4>
+                                    <p>Точная дозировка по объему аквариума</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🐠 Кормление рыб</h4>
+                                    <p>Рацион по биомассе и видам рыб</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-warning" onclick="showSubscriptionModal()" style="font-size: 16px; padding: 15px 30px;">
+                            🚀 Получить PRO доступ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "АЗОТНЫЙ ЦИКЛ" ====================== -->
+        <section id="nitrogen-cycle" class="content-section">
+            <h2>🔄 Азотный цикл в аквариуме</h2>
+
+            <!-- Основы азотного цикла -->
+            <div class="info-card">
+                <h4>🎯 Биохимия азотного цикла</h4>
+                <p><strong>Азотный цикл</strong> - это последовательность биохимических реакций превращения азотсодержащих соединений в аквариуме, осуществляемая автотрофными бактериями.</p>
+
+                <div style="font-family: monospace; background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ddd; overflow-x: auto;">
+                    <strong>Химические реакции:</strong><br>
+                    NH₃ + O₂ → NO₂⁻ + H⁺ + H₂O (Nitrosomonas, ΔG° = -275 кДж/моль)<br>
+                    NO₂⁻ + ½O₂ → NO₃⁻ (Nitrobacter, ΔG° = -76 кДж/моль)<br><br>
+                    <strong>Стехиометрия:</strong><br>
+                    1 мг NH₃-N → 3.43 мг NO₂⁻-N → 4.43 мг NO₃⁻-N<br>
+                    Потребление O₂: 4.57 мг на 1 мг NH₃-N
+                </div>
+            </div>
+
+            <div class="expert-advice">
+                <h4>🔬 Научные основы биофильтрации</h4>
+                <p><strong>Скорость нитрификации зависит от следующих факторов:</strong></p>
+                <ul style="margin: 15px 0; padding-left: 25px; line-height: 1.7;">
+                    <li><strong>Температуры:</strong> Q₁₀ = 2.0-2.3 (удваивается каждые 10°C до 35°C)</li>
+                    <li><strong>pH:</strong> оптимум 7.5-8.5 для Nitrosomonas, 7.0-8.0 для Nitrobacter</li>
+                    <li><strong>Кислорода:</strong> >2 мг/л для нитрификации, потребление 4.57 мг O₂/мг NH₃-N</li>
+                    <li><strong>Площади биозагрузки:</strong> ~1 м²/100 л для стабильной системы</li>
+                    <li><strong>Концентрации субстрата:</strong> кинетика Михаэлиса-Ментен, Km = 0.5-2.0 мг/л NH₃</li>
+                    <li><strong>Ингибиторов:</strong> свободный аммиак >150 мг/л, нитритная кислота >5 мг/л</li>
+                </ul>
+                <div class="expert-source">
+                    Источники: Water Research Journal, Applied Microbiology, Aquacultural Engineering, 
+                    Biotechnology and Bioengineering
+                </div>
+            </div>
+
+            <!-- Этапы азотного цикла -->
+            <div class="nitrogen-stages">
+                <div class="stage-card">
+                    <div class="stage-number">1</div>
+                    <div class="stage-icon">🐠</div>
+                    <h4>Аммонификация (минерализация)</h4>
+                    <p><strong>Источники NH₃/NH₄⁺:</strong></p>
+                    <ul style="text-align: left; margin: 15px 0; font-size: 14px; line-height: 1.6;">
+                        <li><strong>Экскреция рыб:</strong> 20-30 мг NH₃/100г массы рыбы в сутки</li>
+                        <li><strong>Деминерализация белков:</strong> разложение мертвой органики</li>
+                        <li><strong>Несъеденный корм:</strong> через 4-6 часов начинает разлагаться</li>
+                        <li><strong>Отмирающие растения:</strong> особенно быстрорастущие виды</li>
+                        <li><strong>Детрит:</strong> накопление органических остатков в грунте</li>
+                    </ul>
+                    <div class="parameter-card">
+                        <strong>⚠️ Критично:</strong> NH₃ токсичен уже при pH > 7.5<br>
+                        <small>При pH 8.0 и 25°C: 10% общего аммиака = токсичный NH₃</small>
+                    </div>
+                </div>
+
+                <div class="stage-card">
+                    <div class="stage-number">2</div>
+                    <div class="stage-icon">🦠</div>
+                    <h4>Нитритация (1-я ступень нитрификации)</h4>
+                    <p><strong>Nitrosomonas europaea и родственные виды:</strong></p>
+                    <ul style="text-align: left; margin: 15px 0; font-size: 14px; line-height: 1.6;">
+                        <li><strong>Тип:</strong> хемолитоавтотроф, источник углерода - HCO₃⁻</li>
+                        <li><strong>Время удвоения:</strong> 8-16 часов при оптимальных условиях</li>
+                        <li><strong>Чувствительность:</strong> антибиотики, хлор, тяжелые металлы</li>
+                        <li><strong>pH оптимум:</strong> 7.5-8.5, при pH < 6.5 сильное ингибирование</li>
+                        <li><strong>Промежуточные продукты:</strong> NH₂OH (гидроксиламин), NOH (нитроксил)</li>
+                    </ul>
+                    <div class="parameter-card">
+                        <strong>🧪 Биохимия:</strong> NH₃ + O₂ + 2H⁺ + 2e⁻ → NH₂OH + H₂O → NO₂⁻ + 2H⁺<br>
+                        <small>Фермент аммоний-монооксигеназа (AMO)</small>
+                    </div>
+                </div>
+
+                <div class="stage-card">
+                    <div class="stage-number">3</div>
+                    <div class="stage-icon">🦠</div>
+                    <h4>Нитратация (2-я ступень нитрификации)</h4>
+                    <p><strong>Nitrobacter winogradskyi и родственные виды:</strong></p>
+                    <ul style="text-align: left; margin: 15px 0; font-size: 14px; line-height: 1.6;">
+                        <li><strong>Кинетика:</strong> медленнее Nitrosomonas в 5-10 раз</li>
+                        <li><strong>Лимитирующий этап:</strong> определяет скорость всего цикла</li>
+                        <li><strong>Субстрат:</strong> только NO₂⁻, не использует NH₃</li>
+                        <li><strong>Конкуренция:</strong> с гетеротрофными денитрификаторами</li>
+                        <li><strong>Оптимальные условия:</strong> стабильная температура, pH 7.0-8.0</li>
+                    </ul>
+                    <div class="parameter-card">
+                        <strong>⚠️ Внимание:</strong> NO₂⁻ → MetHb у рыб (метгемоглобинемия)<br>
+                        <small>Нитриты связывают гемоглобин, блокируя транспорт O₂</small>
+                    </div>
+                </div>
+
+                <div class="stage-card">
+                    <div class="stage-number">4</div>
+                    <div class="stage-icon">🌱</div>
+                    <h4>Ассимиляция и денитрификация</h4>
+                    <p><strong>Потребление и удаление NO₃⁻:</strong></p>
+                    <ul style="text-align: left; margin: 15px 0; font-size: 14px; line-height: 1.6;">
+                        <li><strong>Растения:</strong> NO₃⁻ → NO₂⁻ → NH₄⁺ → аминокислоты (нитратредуктаза)</li>
+                        <li><strong>Водоросли:</strong> активная конкуренция за азот с высшими растениями</li>
+                        <li><strong>Анаэробная денитрификация:</strong> NO₃⁻ → NO₂⁻ → NO → N₂O → N₂</li>
+                        <li><strong>Подмены воды:</strong> основной способ удаления в большинстве аквариумов</li>
+                        <li><strong>Детрификаторы:</strong> специальные реакторы для морских аквариумов</li>
+                    </ul>
+                    <div class="parameter-card">
+                        <strong>⚖️ Баланс:</strong> Поступление N = Удаление N<br>
+                        <small>Закон сохранения массы применительно к азоту</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Калькуляторы азотного цикла -->
+            <div class="calculator-section">
+                <h3>🧮 Калькуляторы биофильтрации и азотного цикла</h3>
+
+                <div class="calc-grid">
+                    <!-- Калькулятор биозагрузки -->
+                    <div class="calc-card">
+                        <h4>⚖️ Расчет биозагрузки аквариума</h4>
+                        <div class="form-group">
+                            <label>Общая масса рыб (г)</label>
+                            <input type="number" id="fishBiomass" onchange="calculateBioload()" min="0" placeholder="150">
+                            <div class="form-help">Примерная масса всех рыб в аквариуме</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Количество корма в день (г)</label>
+                            <input type="number" id="dailyFood" onchange="calculateBioload()" min="0" placeholder="3">
+                            <div class="form-help">Сухой вес корма, скармливаемого за сутки</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Объем аквариума (л)</label>
+                            <input type="number" id="bioloadVolume" onchange="calculateBioload()" min="1" placeholder="100">
+                        </div>
+                        <div class="form-group">
+                            <label>Температура воды (°C)</label>
+                            <input type="number" id="bioloadTemp" onchange="calculateBioload()" min="15" max="35" value="25">
+                        </div>
+                        <div id="bioloadResult"></div>
+                    </div>
+
+                    <!-- Калькулятор созревания фильтра -->
+                    <div class="calc-card">
+                        <h4>⏱️ Время созревания биофильтра</h4>
+                        <div class="form-group">
+                            <label>Температура воды (°C)</label>
+                            <input type="number" id="maturationTemp" value="25" min="15" max="35" onchange="calculateMaturation()">
+                            <div class="form-help">Влияет на скорость размножения бактерий</div>
+                        </div>
+                        <div class="form-group">
+                            <label>pH воды</label>
+                            <input type="number" id="maturationPH" value="7.5" min="6.0" max="9.0" step="0.1" onchange="calculateMaturation()">
+                            <div class="form-help">Оптимум для нитрификаторов 7.5-8.0</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Использовать стартовые бактерии?</label>
+                            <select id="starterBacteria" onchange="calculateMaturation()">
+                                <option value="no">Нет, естественное заселение</option>
+                                <option value="yes">Да, коммерческие бактерии</option>
+                                <option value="seeded">Да, биозагрузка из старого фильтра</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Площадь биозагрузки (см²)</label>
+                            <input type="number" id="biofilterSurface" min="100" placeholder="5000" onchange="calculateMaturation()">
+                            <div class="form-help">Примерная площадь пористых материалов</div>
+                        </div>
+                        <div id="maturationResult"></div>
+                    </div>
+
+                    <!-- Калькулятор потребления кислорода -->
+                    <div class="calc-card">
+                        <h4>💨 Потребление кислорода при нитрификации</h4>
+                        <div class="form-group">
+                            <label>Производство NH₃-N (мг/сутки)</label>
+                            <input type="number" id="nh3Production" min="0" step="0.1" onchange="calculateOxygenConsumption()">
+                            <div class="form-help">Рассчитается автоматически или введите вручную</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Эффективность нитрификации (%)</label>
+                            <input type="number" id="nitrificationEfficiency" value="85" min="0" max="100" onchange="calculateOxygenConsumption()">
+                            <div class="form-help">Зависит от зрелости и состояния фильтра</div>
+                        </div>
+                        <div id="oxygenConsumptionResult"></div>
+                    </div>
+
+                    <!-- Калькулятор площади биофильтра -->
+                    <div class="calc-card">
+                        <h4>📏 Требуемая площадь биофильтра</h4>
+                        <div class="form-group">
+                            <label>Биозагрузка NH₃-N (мг/сутки)</label>
+                            <input type="number" id="nh3Load" min="0" step="0.1" onchange="calculateBiofilterArea()">
+                        </div>
+                        <div class="form-group">
+                            <label>Тип биозагрузки</label>
+                            <select id="biomediaType" onchange="calculateBiofilterArea()">
+                                <option value="ceramic">Керамические кольца (стандарт)</option>
+                                <option value="bio_balls">Биошары</option>
+                                <option value="sintered_glass">Спеченное стекло</option>
+                                <option value="lava_rock">Лавовая крошка</option>
+                                <option value="plastic_media">Пластиковые наполнители</option>
+                                <option value="sponge">Поролоновые губки</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Скорость потока (л/ч)</label>
+                            <input type="number" id="flowRate" min="50" placeholder="300" onchange="calculateBiofilterArea()">
+                        </div>
+                        <div id="biofilterAreaResult"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Протокол запуска аквариума -->
+            <div class="card featured">
+                <h3>📋 Научный протокол запуска аквариума</h3>
+                <div class="expert-advice">
+                    <h4>🔬 Методика основана на исследованиях:</h4>
+                    <p>Wheaton, F.W. "Aquacultural Engineering" (1977), Spotte, S. "Fish and Invertebrate Culture" (1979), 
+                    Chen, S. et al. "Aquacultural Engineering" (2006). Протокол адаптирован для домашних аквариумов 
+                    с учетом современных биопрепаратов.</p>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="parameter-card">
+                        <div class="parameter-value">День 1-3: Подготовительный этап</div>
+                        <strong>Задачи:</strong><br>
+                        • Установка оборудования, засыпка грунта<br>
+                        • Заливка воды, установка декораций<br>
+                        • Добавление биостартера (10⁹ КОЕ/мл)<br>
+                        • Настройка параметров: pH 7.5-8.0, T=25-27°C<br>
+                        • Включение фильтрации на полную мощность
+                    </div>
+
+                    <div class="parameter-card">
+                        <div class="parameter-value">День 4-7: Источник аммиака</div>
+                        <strong>Варианты:</strong><br>
+                        • Щепотка корма ежедневно (натуральный метод)<br>
+                        • NH₄Cl 2-4 мг/л (контролируемый метод)<br>
+                        • Чистый аммиак 0.5-1 мл на 100л (для опытных)<br>
+                        <strong>Контроль:</strong> NH₃/NH₄, начало роста Nitrosomonas
+                    </div>
+
+                    <div class="parameter-card">
+                        <div class="parameter-value">День 8-14: Аммиачный пик</div>
+                        <strong>Процессы:</strong><br>
+                        • Пик NH₃ 2-5 мг/л (нормально!)<br>
+                        • Появление NO₂⁻ 0.5-1.0 мг/л<br>
+                        • НЕ КОРМИТЬ и НЕ МЕНЯТЬ воду<br>
+                        • Подмены только при NH₃ > 8 мг/л<br>
+                        • Контроль растворенного кислорода
+                    </div>
+
+                    <div class="parameter-card">
+                        <div class="parameter-value">День 15-21: Нитритный пик</div>
+                        <strong>Критический период:</strong><br>
+                        • Пик NO₂⁻ 1-3 мг/л, падение NH₃<br>
+                        • Появление NO₃⁻ 5-15 мг/л<br>
+                        • Рост Nitrobacter (медленнее Nitrosomonas)<br>
+                        • Можно добавить неприхотливые растения<br>
+                        • Мониторинг pH (может падать)
+                    </div>
+
+                    <div class="parameter-card">
+                        <div class="parameter-value">День 22-28: Готовность к рыбе</div>
+                        <strong>Показатели готовности:</strong><br>
+                        • NH₃ и NO₂⁻ < 0.25 мг/л стабильно<br>
+                        • NO₃⁻ 10-25 мг/л (признак работы цикла)<br>
+                        • pH стабилен, KH > 3°dH<br>
+                        • Можно запустить 1-2 неприхотливые рыбки<br>
+                        • Минимальное кормление (через день)
+                    </div>
+
+                    <div class="parameter-card">
+                        <div class="parameter-value">День 29-42: Стабилизация</div>
+                        <strong>Окончательная настройка:</strong><br>
+                        • NH₃, NO₂⁻ → 0 постоянно<br>
+                        • Постепенное увеличение биозагрузки<br>
+                        • Не более 20% новых рыб в неделю<br>
+                        • Начало регулярных подмен воды 15-20%<br>
+                        • Мониторинг поведения рыб
+                    </div>
+                </div>
+
+                <div class="warning-card">
+                    <h4>⚠️ Критические ошибки при запуске</h4>
+                    <div class="grid grid-2">
+                        <div>
+                            <strong>❌ Что НЕ делать:</strong>
+                            <ul style="padding-left: 20px; margin: 10px 0;">
+                                <li>Запускать рыбу в первые 3 недели</li>
+                                <li>Менять воду при первых пиках NH₃/NO₂⁻</li>
+                                <li>Промывать биозагрузку в первый месяц</li>
+                                <li>Добавлять химические нейтрализаторы</li>
+                                <li>Перекармливать первых рыб</li>
+                                <li>Добавлять много рыб сразу</li>
+                                <li>Отключать фильтрацию на ночь</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong>✅ Правильные действия:</strong>
+                            <ul style="padding-left: 20px; margin: 10px 0;">
+                                <li>Терпеливо дождаться завершения цикла</li>
+                                <li>Контролировать температуру и pH</li>
+                                <li>Обеспечить постоянную аэрацию</li>
+                                <li>Тестировать воду каждые 2-3 дня</li>
+                                <li>Вести журнал измерений</li>
+                                <li>Добавлять рыб постепенно</li>
+                                <li>Поддерживать стабильные условия</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Факторы, влияющие на биофильтр -->
+            <div class="warning-card">
+                <h4>☠️ Факторы, разрушающие биофильтрацию</h4>
+                <div class="grid grid-3">
+                    <div>
+                        <h4>💊 Лекарства и химия</h4>
+                        <ul class="tips-list">
+                            <li><strong>Антибиотики:</strong> стрептомицин, эритромицин, тетрациклин</li>
+                            <li><strong>Противогрибковые:</strong> малахитовый зеленый, метиленовый синий</li>
+                            <li><strong>Дезинфектанты:</strong> формалин, перманганат калия</li>
+                            <li><strong>Хлор/хлорамин:</strong> > 0.02 мг/л токсичен для бактерий</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>🌊 Физико-химические факторы</h4>
+                        <ul class="tips-list">
+                            <li><strong>pH-шок:</strong> резкие изменения > ±0.5 единиц за сутки</li>
+                            <li><strong>Температурный шок:</strong> изменения > 5°C за час</li>
+                            <li><strong>Высокая соленость:</strong> > 15‰ ингибирует пресноводные штаммы</li>
+                            <li><strong>Недостаток кислорода:</strong> < 2 мг/л останавливает нитрификацию</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>🧽 Механические повреждения</h4>
+                        <ul class="tips-list">
+                            <li><strong>Пересушивание:</strong> биопленка гибнет за 30-60 минут</li>
+                            <li><strong>Перемывание:</strong> горячей водой или с моющими средствами</li>
+                            <li><strong>Замена всей биозагрузки:</strong> сразу весь объем</li>
+                            <li><strong>Длительное отключение:</strong> > 4 часов без потока воды</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Микроскопия биопленки -->
+            <div class="info-card">
+                <h4>🔬 Микроскопия здоровой биопленки</h4>
+                <p><strong>Структура зрелой биопленки (через 4-6 недель):</strong></p>
+
+                <div class="grid grid-2">
+                    <div>
+                        <h4>🦠 Нитрифицирующие бактерии</h4>
+                        <div class="parameter-card">
+                            <strong>Nitrosomonas europaea:</strong><br>
+                            • Размер: 0.5-1.0 × 1.0-1.7 мкм<br>
+                            • Форма: короткие палочки<br>
+                            • Подвижность: 1-3 жгутика<br>
+                            • Время деления: 8-16 часов
+                        </div>
+                        <div class="parameter-card">
+                            <strong>Nitrobacter winogradskyi:</strong><br>
+                            • Размер: 0.5-0.8 × 1.0-1.3 мкм<br>
+                            • Форма: овальные клетки<br>
+                            • Внутренняя мембранная система<br>
+                            • Время деления: 13-25 часов
+                        </div>
+                    </div>
+                    <div>
+                        <h4>🌐 Сопутствующая микрофлора</h4>
+                        <div class="parameter-card">
+                            <strong>Heterotrophic bacteria:</strong><br>
+                            • Pseudomonas, Flavobacterium<br>
+                            • Утилизируют органику<br>
+                            • Конкуренция за кислород<br>
+                            • Поддерживают структуру биопленки
+                        </div>
+                        <div class="parameter-card">
+                            <strong>Простейшие (индикаторы зрелости):</strong><br>
+                            • Инфузории: Paramecium, Tetrahymena<br>
+                            • Коловратки: Philodina, Rotaria<br>
+                            • Нематоды: Caenorhabditis<br>
+                            • Плотность: 10⁴-10⁶ клеток/мл
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ddd;">
+                    <strong>📊 Количественные показатели зрелой биопленки:</strong><br><br>
+                    • <strong>Плотность нитрификаторов:</strong> 10⁶-10⁸ клеток/см² биозагрузки<br>
+                    • <strong>Толщина биопленки:</strong> 50-200 мкм (оптимум 100-150 мкм)<br>
+                    • <strong>Скорость окисления NH₃:</strong> 0.1-0.5 кг NH₃-N/м³ биозагрузки/сутки<br>
+                    • <strong>Скорость окисления NO₂⁻:</strong> 0.05-0.3 кг NO₂-N/м³ биозагрузки/сутки<br>
+                    • <strong>Соотношение Nitrosomonas:Nitrobacter:</strong> приблизительно 3:1 по численности
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "ОСВЕЩЕНИЕ" ====================== -->
+        <section id="lighting" class="content-section">
+            <h2>💡 Научный расчет освещения аквариума</h2>
+
+            <!-- Основы фотобиологии -->
+            <div class="expert-advice">
+                <h4>🔬 Фотобиология аквариумных растений</h4>
+                <p><strong>Фотосинтез - основа жизни растений:</strong></p>
+                <div style="font-family: monospace; background: white; padding: 20px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd; overflow-x: auto;">
+                    6CO₂ + 6H₂O + 2880 кДж/моль → C₆H₁₂O₆ + 6O₂<br>
+                    Требуется ~8-10 фотонов на молекулу CO₂<br>
+                    Эффективность фотосинтеза: 3-6% (теоретический максимум ~11%)
+                </div>
+                <p>PAR (Photosynthetically Active Radiation, 400-700 нм) - диапазон фотосинтетически активной радиации. 
+                Эффективность различных длин волн описывается кривой МакКри (McCree, 1972).</p>
+                <div class="expert-source">
+                    Источники: Plant Physiology, Aquatic Botany, Journal of Applied Phycology, 
+                    McCree K.J. "The action spectrum, absorptance and quantum yield of photosynthesis in crop plants" (1972)
+                </div>
+            </div>
+
+            <!-- Калькуляторы освещения -->
+            <div class="calculator-section">
+                <h3>🧮 Профессиональные калькуляторы освещения</h3>
+
+                <div class="calc-grid">
+                    <!-- Основной калькулятор PAR -->
+                    <div class="calc-card">
+                        <h4>🔆 Научный калькулятор PAR</h4>
+                        <div class="form-group">
+                            <label>Длина аквариума (см)</label>
+                            <input type="number" id="lightCalcLength" onchange="calculateScientificLighting()" min="10" placeholder="60">
+                        </div>
+                        <div class="form-group">
+                            <label>Ширина аквариума (см)</label>
+                            <input type="number" id="lightCalcWidth" onchange="calculateScientificLighting()" min="10" placeholder="30">
+                        </div>
+                        <div class="form-group">
+                            <label>Высота столба воды (см)</label>
+                            <input type="number" id="lightCalcHeight" onchange="calculateScientificLighting()" min="15" placeholder="40">
+                        </div>
+                        <div class="form-group">
+                            <label>Категория растений</label>
+                            <select id="lightCalcType" onchange="calculateScientificLighting()">
+                                <option value="none">Только рыбы</option>
+                                <option value="shade">Теневыносливые (Anubias, мхи)</option>
+                                <option value="medium">Средние требования (Cryptocoryne)</option>
+                                <option value="high">Светолюбивые (Rotala, Ludwigia)</option>
+                                <option value="carpet">Почвопокровные (HC Cuba)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Тип светильника</label>
+                            <select id="lightFixtureType" onchange="calculateScientificLighting()">
+                                <option value="led">Современный LED (2.5 мкмоль/Дж)</option>
+                                <option value="led_cheap">Бюджетный LED (1.8 мкмоль/Дж)</option>
+                                <option value="t5">T5 люминесцентный (1.6 мкмоль/Дж)</option>
+                                <option value="t8">T8 люминесцентный (1.2 мкмоль/Дж)</option>
+                                <option value="mh">Металлогалогенный (1.3 мкмоль/Дж)</option>
+                            </select>
+                        </div>
+                        <div id="scientificLightResult"></div>
+                    </div>
+
+                    <!-- Калькулятор DLI -->
+                    <div class="calc-card">
+                        <h4>☀️ Daily Light Integral (DLI)</h4>
+                        <div class="form-group">
+                            <label>PAR на уровне растений (мкмоль/м²/с)</label>
+                            <input type="number" id="dliPAR" onchange="calculateDLI()" min="0" placeholder="50">
+                            <div class="form-help">Измерено квантовым сенсором или рассчитано выше</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Фотопериод (часов)</label>
+                            <input type="number" id="dliPhotoperiod" value="8" min="4" max="16" onchange="calculateDLI()">
+                        </div>
+                        <div class="form-group">
+                            <label>Ослабление воды (%)</label>
+                            <input type="number" id="waterAttenuation" value="10" min="0" max="50" onchange="calculateDLI()">
+                            <div class="form-help">Зависит от мутности и окрашенности воды</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Затенение декорациями (%)</label>
+                            <input type="number" id="shadingLoss" value="15" min="0" max="50" onchange="calculateDLI()">
+                        </div>
+                        <div id="dliResult"></div>
+                    </div>
+
+                    <!-- Спектральный анализ -->
+                    <div class="calc-card">
+                        <h4>🌈 Спектральный анализ</h4>
+                        <div class="parameter-card">
+                            <div class="parameter-value">400-500 нм (Синий)</div>
+                            <div style="font-size: 13px;">Хлорофилл А (429, 455 нм), каротиноиды. Компактный рост, крепкие стебли.</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 25%; background: linear-gradient(90deg, #3f51b5, #2196f3);"></div>
+                            </div>
+                            <small>Рекомендуемая доля: 25-30%</small>
+                        </div>
+                        <div class="parameter-card">
+                            <div class="parameter-value">500-600 нм (Зеленый)</div>
+                            <div style="font-size: 13px;">Минимум поглощения хлорофилла, но проникает глубже в воду.</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 15%; background: linear-gradient(90deg, #4caf50, #8bc34a);"></div>
+                            </div>
+                            <small>Рекомендуемая доля: 10-15%</small>
+                        </div>
+                        <div class="parameter-card">
+                            <div class="parameter-value">600-700 нм (Красный)</div>
+                            <div style="font-size: 13px;">Хлорофилл А (663, 678 нм). Максимум фотосинтеза.</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 45%; background: linear-gradient(90deg, #ff5722, #f44336);"></div>
+                            </div>
+                            <small>Рекомендуемая доля: 45-50%</small>
+                        </div>
+                        <div class="parameter-card">
+                            <div class="parameter-value">700-800 нм (БИК)</div>
+                            <div style="font-size: 13px;">Фитохромы, регуляция морфогенеза. Эффект Эмерсона.</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 15%; background: linear-gradient(90deg, #9c27b0, #673ab7);"></div>
+                            </div>
+                            <small>Рекомендуемая доля: 10-15%</small>
+                        </div>
+                    </div>
+
+                    <!-- Температура света -->
+                    <div class="calc-card">
+                        <h4>🌡️ Цветовая температура</h4>
+                        <div class="form-group">
+                            <label>Цветовая температура (K)</label>
+                            <select id="colorTemperature" onchange="analyzeColorTemperature()">
+                                <option value="2700">2700K (Теплый белый)</option>
+                                <option value="3000">3000K (Теплый белый+)</option>
+                                <option value="4000">4000K (Нейтрально-белый)</option>
+                                <option value="5000">5000K (Дневной белый)</option>
+                                <option value="6500" selected>6500K (Дневной свет)</option>
+                                <option value="8000">8000K (Холодный белый)</option>
+                                <option value="10000">10000K (Ультрахолодный)</option>
+                            </select>
+                        </div>
+                        <div id="colorTempResult"></div>
+
+                        <div class="parameter-card">
+                            <strong>💡 Рекомендации по температуре:</strong><br>
+                            • <strong>6500K:</strong> оптимум для растений<br>
+                            • <strong>4000-5000K:</strong> естественная передача цветов<br>
+                            • <strong>8000K+:</strong> усиление синего спектра<br>
+                            • <strong>Смешанное:</strong> 70% 6500K + 30% 3000K
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Технологии освещения -->
+            <div class="card">
+                <h3>💡 Сравнение технологий освещения</h3>
+
+                <div class="grid grid-4">
+                    <div class="info-card">
+                        <h4>🔵 LED освещение (рекомендовано)</h4>
+                        <div class="parameter-value">Эффективность: 2.0-2.8 мкмоль/Дж</div>
+                        <p><strong>Плюсы:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Низкое тепловыделение</li>
+                            <li>Долговечность 50,000+ часов</li>
+                            <li>Полный контроль спектра</li>
+                            <li>Диммирование и автоматизация</li>
+                            <li>Низкое энергопотребление</li>
+                        </ul>
+                        <p><strong>Минусы:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Высокая начальная стоимость</li>
+                            <li>Точечный свет (нужны линзы)</li>
+                            <li>Деградация диодов</li>
+                        </ul>
+                        <div class="test-result excellent">
+                            <strong>Выбор профессионалов</strong>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>💡 T5 люминесцентные</h4>
+                        <div class="parameter-value">Эффективность: 1.4-1.7 мкмоль/Дж</div>
+                        <p><strong>Плюсы:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Равномерное освещение</li>
+                            <li>Проверенная технология</li>
+                            <li>Умеренная цена</li>
+                            <li>Большой выбор спектров</li>
+                        </ul>
+                        <p><strong>Минусы:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Деградация 5-10%/год</li>
+                            <li>Содержат ртуть</li>
+                            <li>Нагрев воды</li>
+                            <li>Фиксированный спектр</li>
+                        </ul>
+                        <div class="test-result good">
+                            <strong>Золотая середина</strong>
+                        </div>
+                    </div>
+
+                    <div class="warning-card">
+                        <h4>🔥 Металлогалогенные (HQI)</h4>
+                        <div class="parameter-value">Эффективность: 1.0-1.3 мкмоль/Дж</div>
+                        <p><strong>Плюсы:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Сильный световой поток</li>
+                            <li>Близок к солнечному спектру</li>
+                            <li>Глубокое проникновение</li>
+                            <li>Высокий CRI > 90</li>
+                        </ul>
+                        <p><strong>Минусы:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Очень высокое энергопотребление</li>
+                            <li>Сильный нагрев (нужен чиллер)</li>
+                            <li>Короткий срок службы</li>
+                            <li>Опасность взрыва лампы</li>
+                        </ul>
+                        <div class="test-result warning">
+                            <strong>Только для глубоких аквариумов >60 см</strong>
+                        </div>
+                    </div>
+
+                    <div class="parameter-card">
+                        <h4>⚠️ T8 и компактные люминесцентные</h4>
+                        <div class="parameter-value">Эффективность: 0.8-1.2 мкмоль/Дж</div>
+                        <p><strong>Статус:</strong> Устаревшие технологии</p>
+                        <p><strong>Применение:</strong></p>
+                        <ul style="padding-left: 20px; margin: 10px 0; font-size: 13px;">
+                            <li>Только для неприхотливых растений</li>
+                            <li>Бюджетные решения</li>
+                            <li>Временные установки</li>
+                        </ul>
+                        <div class="test-result danger">
+                            <strong>НЕ рекомендуется для серьезных травников</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Режимы освещения -->
+            <div class="card">
+                <h3>🕐 Циркадные ритмы и режимы освещения</h3>
+
+                <div class="info-card">
+                    <h4>⏰ Оптимальный суточный цикл освещения</h4>
+                    <p>Растения и рыбы нуждаются в естественных циркадных ритмах для нормального физиологического функционирования.</p>
+                </div>
+
+                <div class="grid grid-4">
+                    <div class="parameter-card" style="background: linear-gradient(135deg, #ffecb3 0%, #fff3c4 100%);">
+                        <strong>06:00-08:00 (Рассвет)</strong><br>
+                        <div style="margin: 10px 0; font-size: 13px;">
+                            • Постепенное увеличение 0% → 100%<br>
+                            • Спектр: 2700K → 6500K<br>
+                            • Имитация восхода солнца<br>
+                            • Активация метаболизма
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 30%; background: linear-gradient(90deg, #ff9800, #ffc107);"></div>
+                        </div>
+                    </div>
+
+                    <div class="parameter-card" style="background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%);">
+                        <strong>08:00-16:00 (Полный день)</strong><br>
+                        <div style="margin: 10px 0; font-size: 13px;">
+                            • Полная интенсивность 100%<br>
+                            • Спектр: 6500K полный<br>
+                            • Максимум фотосинтеза<br>
+                            • Активность рыб пик
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 100%; background: linear-gradient(90deg, #2196f3, #03a9f4);"></div>
+                        </div>
+                    </div>
+
+                    <div class="parameter-card" style="background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);">
+                        <strong>16:00-18:00 (Закат)</strong><br>
+                        <div style="margin: 10px 0; font-size: 13px;">
+                            • Снижение 100% → 10-20%<br>
+                            • Спектр: 6500K → 3000K<br>
+                            • Имитация заката<br>
+                            • Подготовка к отдыху
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 20%; background: linear-gradient(90deg, #ff5722, #ff9800);"></div>
+                        </div>
+                    </div>
+
+                    <div class="parameter-card" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%);">
+                        <strong>18:00-06:00 (Ночь)</strong><br>
+                        <div style="margin: 10px 0; font-size: 13px;">
+                            • Лунный свет 0.1% или темнота<br>
+                            • Спектр: 460 нм синий<br>
+                            • Ночная активность<br>
+                            • Восстановление растений
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 1%; background: linear-gradient(90deg, #3f51b5, #673ab7);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="expert-advice">
+                    <h4>🔬 Научное обоснование режимов</h4>
+                    <div class="grid grid-2">
+                        <div>
+                            <strong>Для растений:</strong>
+                            <ul style="padding-left: 20px; margin: 10px 0;">
+                                <li>CAM фотосинтез активен ночью</li>
+                                <li>Темновые реакции нужны для синтеза</li>
+                                <li>Избыточный свет вызывает фотоингибирование</li>
+                                <li>Циркадные часы регулируют цветение</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong>Для рыб:</strong>
+                            <ul style="padding-left: 20px; margin: 10px 0;">
+                                <li>Мелатонин регулирует сон</li>
+                                <li>Кортизол - циркадный ритм стресса</li>
+                                <li>Пищевая активность привязана к свету</li>
+                                <li>Размножение зависит от фотопериода</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Проблемы и решения -->
+            <div class="warning-card">
+                <h4>⚠️ Частые проблемы освещения и их решения</h4>
+
+                <div class="grid grid-2">
+                    <div>
+                        <h4>🌿 Проблемы растений</h4>
+                        <div class="parameter-card">
+                            <strong>Этиоляция (вытягивание):</strong><br>
+                            <small>Недостаток света или неправильный спектр</small><br>
+                            <strong>Решение:</strong> ↑PAR, добавить красный спектр 660nm
+                        </div>
+                        <div class="parameter-card">
+                            <strong>Хлороз (желтение):</strong><br>
+                            <small>Избыток света без CO₂/питания</small><br>
+                            <strong>Решение:</strong> ↓фотопериод, добавить CO₂, удобрения
+                        </div>
+                        <div class="parameter-card">
+                            <strong>Фотоингибирование:</strong><br>
+                            <small>PAR > 200 мкмоль/м²/с без CO₂</small><br>
+                            <strong>Решение:</strong> ↓интенсивность, CO₂ система
+                        </div>
+                    </div>
+                    <div>
+                        <h4>🦠 Проблемы водорослей</h4>
+                        <div class="parameter-card">
+                            <strong>Зеленые нитчатые:</strong><br>
+                            <small>Избыток света + дисбаланс NPK</small><br>
+                            <strong>Решение:</strong> ↓PAR, проверить NO₃:PO₄ = 10:1
+                        </div>
+                        <div class="parameter-card">
+                            <strong>Диатомовые (бурые):</strong><br>
+                            <small>Слабый свет + высокие SiO₂</small><br>
+                            <strong>Решение:</strong> ↑интенсивность, ↓силикаты
+                        </div>
+                        <div class="parameter-card">
+                            <strong>Синезеленые:</strong><br>
+                            <small>Стагнация воды + органика</small><br>
+                            <strong>Решение:</strong> ↑поток, УФ-стерилизация
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Практические рекомендации -->
+            <div class="expert-advice">
+                <h4>🔧 Практические рекомендации по установке</h4>
+                <div class="grid grid-3">
+                    <div>
+                        <h4>📏 Размещение светильников</h4>
+                        <ul class="tips-list">
+                            <li>Высота подвеса LED: 15-25 см над водой</li>
+                            <li>Угол освещения: 120° для равномерности</li>
+                            <li>Отражатели увеличивают КПД на 15-30%</li>
+                            <li>Защита IP67 для влажных условий</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>🎛️ Контроллеры и автоматика</h4>
+                        <ul class="tips-list">
+                            <li>Диммирование 0-100% обязательно</li>
+                            <li>Спектральная настройка по каналам</li>
+                            <li>Программируемые сценарии</li>
+                            <li>Датчики освещенности для коррекции</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>🌡️ Тепловое управление</h4>
+                        <ul class="tips-list">
+                            <li>Пассивное охлаждение до 50W</li>
+                            <li>Активное охлаждение >100W</li>
+                            <li>Температурная стабилизация драйверов</li>
+                            <li>Контроль температуры воды</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================== РАЗДЕЛ "АКВАСКЕЙПИНГ" (PRO) ====================== -->
+        <section id="aquascaping" class="content-section">
+            <div class="pro-feature" data-pro="analytics">
+                <div id="aquascapingContent">
+                    <div class="section-locked">
+                        <div class="lock-icon">🔒</div>
+                        <div class="lock-title">Акваскейпинг и дизайн</div>
+                        <div class="lock-description">
+                            Изучите профессиональные техники создания природных композиций: золотое сечение, 
+                            стили Такаши Амано, правила размещения декораций, цветовая гармония, 
+                            подбор растений по зонам и многое другое от мастеров акваскейпинга.
+                        </div>
+                        <div style="margin: 30px 0;">
+                            <div class="grid grid-4">
+                                <div class="card">
+                                    <h4>📐 Золотое сечение</h4>
+                                    <p>Математические основы гармоничных композиций</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🌲 Природный стиль</h4>
+                                    <p>Техники Такаши Амано и школы ADA</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🗻 Iwagumi</h4>
+                                    <p>Минимализм и философия камней</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🌊 Голландский стиль</h4>
+                                    <p>Классические европейские традиции</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🎨 Цветовая палитра</h4>
+                                    <p>Теория цвета в подводном саду</p>
+                                </div>
+                                <div class="card">
+                                    <h4>🌿 Зонирование</h4>
+                                    <p>Планы: передний, средний, задний</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-warning" onclick="showSubscriptionModal()" style="font-size: 16px; padding: 15px 30px;">
+                            🚀 Получить PRO доступ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast уведомления -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Подключение скриптов -->
+    <script src="subscription.js"></script>
+    <script src="app.js"></script>
+
+    <!-- Критически важные встроенные функции -->
+    <script>
+        // ============================================
+        // КРИТИЧЕСКИЕ ВСТРОЕННЫЕ ФУНКЦИИ ДЛЯ ПРОДАКШНА
+        // ============================================
+
+        // Глобальные переменные
+        window.akvaStorApp = {
+            version: '2.0.0',
+            isPWA: false,
+            databases: {
+                fish: null,
+                plants: null
+            },
+            userData: {
+                aquarium: {},
+                photos: [],
+                notes: [],
+                waterTests: [],
+                tasks: [],
+                myFish: [],
+                myPlants: []
+            }
+        };
+
+        // Инициализация приложения
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🐠 АкваСбор PRO v2.0.0 - Инициализация...');
+
+            // Скрыть прелоадер
+            setTimeout(() => {
+                const preloader = document.getElementById('preloader');
+                if (preloader) {
+                    preloader.classList.add('hidden');
+                    setTimeout(() => preloader.remove(), 600);
+                }
+            }, 2000);
+
+            // Загрузить данные
+            loadUserData();
+            updateAllStats();
+            initNavigation();
+            initPWAFeatures();
+            initFloatingButtons();
+
+            // Загрузить базы данных
+            loadDatabases();
+
+            // Показать приветствие
+            setTimeout(() => {
+                showToast('🐠 АкваСбор PRO загружен успешно!', 'success');
+            }, 2500);
+        });
+
+        // Загрузка баз данных
+        async function loadDatabases() {
+            try {
+                console.log('📊 Загружаем базы данных...');
+
+                // Загрузка рыб
+                const fishResponse = await fetch('./data/fish-database.json');
+                if (fishResponse.ok) {
+                    window.akvaStorApp.databases.fish = await fishResponse.json();
+                    console.log('✅ База рыб загружена:', Object.keys(window.akvaStorApp.databases.fish).length, 'видов');
+                }
+
+                // Загрузка растений  
+                const plantsResponse = await fetch('./data/plants-database.json');
+                if (plantsResponse.ok) {
+                    window.akvaStorApp.databases.plants = await plantsResponse.json();
+                    console.log('✅ База растений загружена:', Object.keys(window.akvaStorApp.databases.plants).length, 'видов');
+                }
+
+            } catch (error) {
+                console.error('❌ Ошибка загрузки баз данных:', error);
+                showToast('⚠️ Базы данных загружены из кэша', 'warning');
+            }
+        }
+
+        // Загрузка пользовательских данных
+        function loadUserData() {
+            try {
+                // Параметры аквариума
+                const aquariumData = localStorage.getItem('akvastor_aquarium_params');
+                if (aquariumData) {
+                    const params = JSON.parse(aquariumData);
+                    window.akvaStorApp.userData.aquarium = params;
+
+                    // Заполнить форму
+                    if (params.volume) document.getElementById('aquariumVolume').value = params.volume;
+                    if (params.startDate) document.getElementById('aquariumStartDate').value = params.startDate;
+                    if (params.type) document.getElementById('aquariumType').value = params.type;
+                    if (params.filtration) document.getElementById('filtrationSystem').value = params.filtration;
+                    if (params.lighting) document.getElementById('aquariumLighting').value = params.lighting;
+                    if (params.co2) document.getElementById('co2System').value = params.co2;
+                    if (params.length) document.getElementById('aquariumLength').value = params.length;
+                    if (params.width) document.getElementById('aquariumWidth').value = params.width;
+                    if (params.height) document.getElementById('aquariumHeight').value = params.height;
+                    if (params.glassThickness) document.getElementById('glassThickness').value = params.glassThickness;
+                    if (params.heaterPower) document.getElementById('heaterPower').value = params.heaterPower;
+                    if (params.filterFlow) document.getElementById('filterFlow').value = params.filterFlow;
+                    if (params.airPump) document.getElementById('airPump').value = params.airPump;
+                    if (params.uvSterilizer) document.getElementById('uvSterilizer').value = params.uvSterilizer;
+                }
+
+                // Загрузить заметки
+                const notesData = localStorage.getItem('akvastor_notes');
+                if (notesData) {
+                    window.akvaStorApp.userData.notes = JSON.parse(notesData);
+                }
+
+                // Загрузить тесты воды
+                const testsData = localStorage.getItem('akvastor_test_history');
+                if (testsData) {
+                    window.akvaStorApp.userData.waterTests = JSON.parse(testsData);
+                }
+
+                // Загрузить фото
+                const photosData = localStorage.getItem('akvastor_photos');
+                if (photosData) {
+                    window.akvaStorApp.userData.photos = JSON.parse(photosData);
+                }
+
+                // Загрузить задачи
+                const tasksData = localStorage.getItem('akvastor_tasks');
+                if (tasksData) {
+                    window.akvaStorApp.userData.tasks = JSON.parse(tasksData);
+                }
+
+                // Загрузить мои рыбы
+                const myFishData = localStorage.getItem('akvastor_my_fish');
+                if (myFishData) {
+                    window.akvaStorApp.userData.myFish = JSON.parse(myFishData);
+                }
+
+                // Загрузить мои растения
+                const myPlantsData = localStorage.getItem('akvastor_my_plants');
+                if (myPlantsData) {
+                    window.akvaStorApp.userData.myPlants = JSON.parse(myPlantsData);
+                }
+
+                console.log('📊 Пользовательские данные загружены');
+
+            } catch (error) {
+                console.error('❌ Ошибка загрузки пользовательских данных:', error);
+            }
+        }
+
+        // Сохранение пользовательских данных
+        function saveUserData() {
+            try {
+                localStorage.setItem('akvastor_aquarium_params', JSON.stringify(window.akvaStorApp.userData.aquarium));
+                localStorage.setItem('akvastor_notes', JSON.stringify(window.akvaStorApp.userData.notes));
+                localStorage.setItem('akvastor_test_history', JSON.stringify(window.akvaStorApp.userData.waterTests));
+                localStorage.setItem('akvastor_photos', JSON.stringify(window.akvaStorApp.userData.photos));
+                localStorage.setItem('akvastor_tasks', JSON.stringify(window.akvaStorApp.userData.tasks));
+                localStorage.setItem('akvastor_my_fish', JSON.stringify(window.akvaStorApp.userData.myFish));
+                localStorage.setItem('akvastor_my_plants', JSON.stringify(window.akvaStorApp.userData.myPlants));
+            } catch (error) {
+                console.error('❌ Ошибка сохранения:', error);
+            }
+        }
+
+        // Обновление всех статистик
+        function updateAllStats() {
+            updateMainStats();
+            updateNotesStats();
+            updateWaterTestStats();
+            updateLastWaterTest();
+            updateNotesList();
+            updatePhotoGallery();
+            updateTasksList();
+        }
+
+        // Обновление основной статистики
+        function updateMainStats() {
+            document.getElementById('totalPhotos').textContent = window.akvaStorApp.userData.photos.length || 0;
+            document.getElementById('totalNotes').textContent = window.akvaStorApp.userData.notes.length || 0;
+            document.getElementById('totalTests').textContent = window.akvaStorApp.userData.waterTests.length || 0;
+            document.getElementById('totalFish').textContent = window.akvaStorApp.userData.myFish.length || 0;
+            document.getElementById('totalPlants').textContent = window.akvaStorApp.userData.myPlants.length || 0;
+
+            // Возраст аквариума
+            const startDate = window.akvaStorApp.userData.aquarium.startDate;
+            if (startDate) {
+                const start = new Date(startDate);
+                const today = new Date();
+                const diffTime = Math.abs(today - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                document.getElementById('aquariumAge').textContent = diffDays;
+            }
+        }
+
+        // Навигация
+        function initNavigation() {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    // Проверяем PRO доступ
+                    if (this.classList.contains('pro-locked')) {
+                        const subscription = localStorage.getItem('akvastor_subscription') || 'free';
+                        if (subscription === 'free') {
+                            showSubscriptionModal();
+                            return;
+                        }
+                    }
+
+                    // Переключаем секции
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+
+                    this.classList.add('active');
+                    const sectionId = this.getAttribute('data-section');
+                    const section = document.getElementById(sectionId);
+                    if (section) {
+                        section.classList.add('active');
+
+                        // Обновляем контент секции
+                        updateSectionContent(sectionId);
+                    }
+                });
+            });
+        }
+
+        // Обновление контента секций
+        function updateSectionContent(sectionId) {
+            switch (sectionId) {
+                case 'my-aquarium':
+                    updateAllStats();
+                    break;
+                case 'water-analysis':
+                    updateWaterTestStats();
+                    updateWaterTestHistory();
+                    break;
+                case 'fish-compatibility':
+                    if (isProUser()) loadFishCompatibility();
+                    break;
+                case 'plant-compatibility':
+                    if (isProUser()) loadPlantCompatibility();
+                    break;
+                case 'calculators':
+                    if (isProUser()) loadCalculators();
+                    break;
+                case 'aquascaping':
+                    if (isProUser()) loadAquascaping();
+                    break;
+            }
+        }
+
+        // Проверка PRO статуса
+        function isProUser() {
+            const subscription = localStorage.getItem('akvastor_subscription') || 'free';
+            return subscription === 'pro' || subscription === 'trial';
+        }
+
+        // PWA функции
+        function initPWAFeatures() {
+            // Регистрация Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker зарегистрирован');
+                        window.akvaStorApp.isPWA = true;
+                    })
+                    .catch(error => {
+                        console.log('❌ Ошибка регистрации Service Worker:', error);
+                    });
+            }
+
+            // Установка PWA
+            let deferredPrompt;
+            const installBtn = document.getElementById('installBtn');
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                installBtn.style.display = 'block';
+            });
+
+            installBtn.addEventListener('click', async () => {
+                if (!deferredPrompt) {
+                    showToast('ℹ️ Приложение уже установлено', 'info');
+                    return;
+                }
+
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+
+                if (outcome === 'accepted') {
+                    showToast('✅ Приложение установлено!', 'success');
+                    installBtn.style.display = 'none';
+                } else {
+                    showToast('ℹ️ Установка отменена', 'info');
+                }
+
+                deferredPrompt = null;
+            });
+        }
+
+        // Плавающие кнопки
+        function initFloatingButtons() {
+            // Уведомления
+            document.getElementById('notificationBtn').addEventListener('click', function() {
+                requestNotificationPermission();
+            });
+
+            // Быстрое меню
+            document.getElementById('quickMenuBtn').addEventListener('click', function() {
+                showQuickMenu();
+            });
+        }
+
+        // Push уведомления
+        function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                showToast('❌ Уведомления не поддерживаются', 'error');
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                showTestNotification();
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        showTestNotification();
+                        showToast('✅ Уведомления включены!', 'success');
+                    } else {
+                        showToast('❌ Уведомления запрещены', 'error');
+                    }
+                });
+            } else {
+                showToast('❌ Уведомления заблокированы в настройках', 'error');
+            }
+        }
+
+        function showTestNotification() {
+            new Notification('🐠 АкваСбор PRO', {
+                body: 'Не забудьте проверить параметры воды!',
+                icon: './icons/icon-192.png',
+                badge: './icons/badge-72.png',
+                tag: 'water-reminder',
+                requireInteraction: true
+            });
+        }
+
+        // Быстрое меню
+        function showQuickMenu() {
+            const menuHTML = `
+                <div class="modal-overlay" onclick="this.remove()">
+                    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 400px;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                        <h3>⚡ Быстрые действия</h3>
+
+                        <div class="grid grid-2" style="margin: 25px 0; gap: 15px;">
+                            <button class="btn btn-primary" onclick="quickWaterTest(); this.closest('.modal-overlay').remove();">
+                                🧪 Экспресс-тест воды
+                            </button>
+                            <button class="btn btn-secondary" onclick="addQuickNote('📸 Сделал фото аквариума'); this.closest('.modal-overlay').remove();">
+                                📸 Быстрая заметка
+                            </button>
+                            <button class="btn btn-info" onclick="document.querySelector('[data-section=\"my-aquarium\"]').click(); this.closest('.modal-overlay').remove();">
+                                🏠 Мой аквариум
+                            </button>
+                            <button class="btn btn-success" onclick="scheduleWaterChange(); this.closest('.modal-overlay').remove();">
+                                🔄 Напомнить подмену
+                            </button>
+                            <button class="btn btn-warning" onclick="showSubscriptionModal(); this.closest('.modal-overlay').remove();">
+                                🚀 Получить PRO
+                            </button>
+                            <button class="btn btn-danger" onclick="exportAllData(); this.closest('.modal-overlay').remove();">
+                                📤 Экспорт данных
+                            </button>
+                        </div>
+
+                        <p style="text-align: center; color: #666; font-size: 12px;">
+                            АкваСбор PRO v2.0.0
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            const modal = document.createElement('div');
+            modal.innerHTML = menuHTML;
+            document.body.appendChild(modal);
+        }
+
+        // Быстрый переход к тесту воды
+        function quickWaterTest() {
+            document.querySelector('[data-section="water-analysis"]').click();
+            setTimeout(() => {
+                document.getElementById('quickPH')?.focus();
+            }, 300);
+        }
+
+        // Показать модальное окно подписки
+        function showSubscriptionModal() {
+            if (typeof window.subscriptionManager !== 'undefined' && window.subscriptionManager.showSubscriptionModal) {
+                window.subscriptionManager.showSubscriptionModal();
+            } else {
+                // Fallback если subscription.js не загружен
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width: 500px; text-align: center;">
+                        <button class="modal-close" onclick="this.remove()">×</button>
+                        <h3>🚀 АкваСбор PRO</h3>
+                        <p style="margin: 20px 0; color: #666; line-height: 1.6;">
+                            Получите доступ ко всем профессиональным функциям для серьезной аквариумистики
+                        </p>
+
+                        <div class="card" style="background: #f8f9fa; margin: 25px 0; text-align: left;">
+                            <h4 style="color: #159895; margin-bottom: 15px;">✨ Что входит в PRO:</h4>
+                            <ul style="padding-left: 20px; line-height: 2;">
+                                <li>🐠 База данных 200+ видов рыб с анализом совместимости</li>
+                                <li>🌿 База данных 150+ растений с умными рекомендациями</li>
+                                <li>🧮 15+ профессиональных калькуляторов с научными алгоритмами</li>
+                                <li>🎨 Мастер-класс по акваскейпингу от экспертов</li>
+                                <li>📊 Детальная аналитика и экспорт всех данных</li>
+                                <li>🔔 Умные Push-уведомления и напоминания</li>
+                                <li>💡 AI-рекомендации по уходу за аквариумом</li>
+                                <li>📱 Полнофункциональное PWA без ограничений</li>
+                            </ul>
+                        </div>
+
+                        <div style="font-size: 2.5rem; color: #ff6b35; margin: 25px 0; font-weight: bold;">
+                            399 ₽/месяц
+                        </div>
+
+                        <div style="margin: 30px 0;">
+                            <button class="btn btn-warning" onclick="startPayment()" style="font-size: 18px; padding: 15px 40px;">
+                                💳 Оплатить через ЮКасса
+                            </button>
+                        </div>
+
+                        <p style="font-size: 13px; color: #999; margin-top: 25px;">
+                            ✅ Безопасная оплата • 🔄 Отменить можно в любой момент • 💰 Первые 7 дней бесплатно
+                        </p>
+                    </div>
+                `;
+
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+
+                document.body.appendChild(modal);
+            }
+        }
+
+        // Запуск платежа
+        function startPayment() {
+            showToast('💳 Переход к оплате через ЮКасса...', 'info');
+
+            // TODO: Здесь будет реальная интеграция с ЮКасса
+            setTimeout(() => {
+                updateSubscriptionStatus('pro');
+                showToast('✅ Добро пожаловать в PRO! Все функции разблокированы', 'success');
+                document.querySelector('.modal-overlay')?.remove();
+            }, 2000);
+        }
+
+        // Пробный период
+        function startTrial() {
+            const hasUsedTrial = localStorage.getItem('akvastor_trial_used');
+            if (hasUsedTrial) {
+                showToast('⚠️ Пробный период уже использован', 'warning');
+                return;
+            }
+
+            updateSubscriptionStatus('trial');
+            localStorage.setItem('akvastor_trial_used', 'true');
+            localStorage.setItem('akvastor_trial_end', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
+
+            showToast('🎉 Пробный период на 7 дней активирован!', 'success');
+        }
+
+        // Обновление статуса подписки
+        function updateSubscriptionStatus(status) {
+            const statusElement = document.getElementById('subscriptionStatus');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const trialBtn = document.getElementById('trialBtn');
+
+            if (status === 'pro') {
+                statusElement.textContent = 'PRO АКТИВЕН';
+                statusElement.className = 'subscription-status pro';
+                subscribeBtn.style.display = 'none';
+                trialBtn.style.display = 'none';
+
+                unlockPROContent();
+
+            } else if (status === 'trial') {
+                statusElement.textContent = 'ПРОБНЫЙ ПЕРИОД';
+                statusElement.className = 'subscription-status trial';
+                subscribeBtn.textContent = '🚀 Купить PRO';
+                trialBtn.style.display = 'none';
+
+                unlockPROContent();
+
+            } else {
+                statusElement.textContent = 'БЕСПЛАТНО';
+                statusElement.className = 'subscription-status free';
+                subscribeBtn.style.display = 'inline-block';
+                trialBtn.style.display = 'inline-block';
+
+                lockPROContent();
+            }
+
+            localStorage.setItem('akvastor_subscription', status);
+        }
+
+        // Разблокировка PRO контента
+        function unlockPROContent() {
+            document.querySelectorAll('.nav-btn.pro-locked').forEach(btn => {
+                btn.classList.remove('pro-locked');
+                const badge = btn.querySelector('.pro-badge');
+                if (badge) badge.remove();
+            });
+
+            document.querySelectorAll('.pro-feature, .pro-only').forEach(element => {
+                element.classList.remove('locked');
+            });
+
+            console.log('✅ PRO контент разблокирован');
+        }
+
+        // Блокировка PRO контента
+        function lockPROContent() {
+            // Возвращаем блокировки (для демонстрации)
+            const proSections = ['fish-compatibility', 'plant-compatibility', 'calculators', 'aquascaping'];
+            proSections.forEach(sectionId => {
+                const btn = document.querySelector(`[data-section="${sectionId}"]`);
+                if (btn && !btn.classList.contains('pro-locked')) {
+                    btn.classList.add('pro-locked');
+                    if (!btn.querySelector('.pro-badge')) {
+                        btn.innerHTML += ' <span class="pro-badge">PRO</span>';
+                    }
+                }
+            });
+        }
+
+        // Проверка подписки при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedSubscription = localStorage.getItem('akvastor_subscription') || 'free';
+
+            // Проверка истечения пробного периода
+            if (savedSubscription === 'trial') {
+                const trialEnd = localStorage.getItem('akvastor_trial_end');
+                if (trialEnd && new Date() > new Date(trialEnd)) {
+                    updateSubscriptionStatus('free');
+                    showToast('⏰ Пробный период истек. Оформите подписку PRO', 'warning');
+                } else {
+                    updateSubscriptionStatus('trial');
+                }
+            } else {
+                updateSubscriptionStatus(savedSubscription);
+            }
+        });
+
+        // Показать toast уведомление
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, type === 'error' ? 5000 : 3000);
+        }
+
+        // ============================================
+        // ФУНКЦИИ ДЛЯ РАЗДЕЛОВ - ПРОДОЛЖЕНИЕ СЛЕДУЕТ...
+        // ============================================
+
+        console.log('🚀 АкваСбор PRO v2.0.0 - Основные функции загружены');
+    </script>
+</body>
+</html>
